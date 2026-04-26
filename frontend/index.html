@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Controller - Broadcast Timer</title>
+    <style>
+        body {
+            background: #222;
+            color: #eee;
+            font-family: sans-serif;
+            padding: 2rem;
+        }
+
+        .panel {
+            background: #333;
+            padding: 1rem;
+            border-radius: 8px;
+            max-width: 400px;
+            margin: auto;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .timecode {
+            font-size: 3rem;
+            font-family: monospace;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="panel">
+        <div class="timecode" id="preview">00:00:00:00</div>
+        <div style="text-align: center;">
+            <button onclick="timerApp.sendAction('running')">START</button>
+            <button onclick="timerApp.sendAction('stopped')">STOP</button>
+            <button onclick="resetTimer()">RESET</button>
+        </div>
+        <hr>
+        <button onclick="window.open('monitor.html', '_blank', 'width=800,height=600')">表示モニターを開く</button>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        const API_URL = "wss://YOUR_API_ID.execute-api.REGION.amazonaws.com/prod";
+        const previewEl = document.getElementById('preview');
+        const timerApp = new BroadcastTimer(API_URL);
+
+        function updatePreview() {
+            previewEl.innerText = timerApp.formatTimecode(timerApp.getCurrentFrame());
+            requestAnimationFrame(updatePreview);
+        }
+
+        function resetTimer() {
+            timerApp.state.baseFrames = 0;
+            timerApp.sendAction('reset');
+        }
+
+        requestAnimationFrame(updatePreview);
+    </script>
+</body>
+
+</html>

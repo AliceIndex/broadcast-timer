@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Monitor - Broadcast Timer</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            cursor: none; /* 現場でのマウス映り込み防止 */
+        }
+        #display { font-size: 18vw; font-variant-numeric: tabular-nums; }
+    </style>
+</head>
+<body>
+    <div id="display">00:00:00:00</div>
+
+    <script src="app.js"></script>
+    <script>
+        const API_URL = "wss://YOUR_API_ID.execute-api.REGION.amazonaws.com/prod";
+        const displayEl = document.getElementById('display');
+        const timerApp = new BroadcastTimer(API_URL);
+
+        function updateLoop() {
+            const frames = timerApp.getCurrentFrame();
+            displayEl.innerText = timerApp.formatTimecode(frames);
+            requestAnimationFrame(updateLoop);
+        }
+        
+        // 画面ダブルクリックでフルスクリーン切り替え
+        window.addEventListener('dblclick', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                navigator.wakeLock.request('screen'); // スリープ防止
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        requestAnimationFrame(updateLoop);
+    </script>
+</body>
+</html>

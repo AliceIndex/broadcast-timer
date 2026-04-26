@@ -1,0 +1,12 @@
+# Binaries
+bin/
+bootstrap
+*.zip
+*.exe
+
+# CDK
+cdk.out/
+.cdk.staging/
+
+# Go
+go.sum
