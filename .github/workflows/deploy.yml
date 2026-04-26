@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main # mainブランチに変更があった時に実行
+      - develop # developブランチも監視対象に追加
 
 # OIDC連携のために必要な権限設定
 permissions:
@@ -50,3 +51,18 @@ jobs:
           go mod tidy
           # CI環境のため、確認プロンプトをスキップしてデプロイ
           cdk deploy -c env=prod --require-approval never
+
+      - name: Determine Environment
+        id: env-check
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
+            echo "env_name=prod" >> $GITHUB_OUTPUT
+          else
+            echo "env_name=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy via CDK
+        working-directory: ./infra
+        run: |
+          # 判定した環境名（dev or prod）を -c env に渡す
+          cdk deploy -c env=${{ steps.env-check.outputs.env_name }} --require-approval never --profile dev-profile
