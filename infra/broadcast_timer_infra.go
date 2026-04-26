@@ -22,8 +22,8 @@ func NewBroadcastTimerStack(scope constructs.Construct, id string, props *awscdk
 
 	// LambdaにAPI Gateway接続を管理する権限を付与
 	handler.AddToRolePolicy(awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
-		Actions:   jsii.StringSlice([]string{"execute-api:ManageConnections"}),
-		Resources: jsii.StringSlice([]string{"arn:aws:execute-api:*:*:*/*/*/*"}),
+		Actions:   jsii.Strings([]string{"execute-api:ManageConnections"}),
+		Resources: jsii.Strings([]string{"arn:aws:execute-api:*:*:*/*/*/*"}),
 	}))
 
 	// WebSocket API の作成
