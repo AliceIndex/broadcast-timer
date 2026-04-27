@@ -1,69 +1,133 @@
-class BroadcastTimer {
-    constructor(wsUrl, onSyncCallback) {
-        this.socket = new WebSocket(wsUrl);
-        this.onSync = onSyncCallback;
-        this.state = {
-            running: false,
-            referenceUTC: 0,
-            baseFrames: 0,
-            fps: 29.97,
-            isDF: true
-        };
+// デプロイ時に取得した本番環境のURL
+const API_URL = "wss://2cz26o6t9k.execute-api.ap-northeast-1.amazonaws.com/prod";
 
-        this.socket.onmessage = (event) => {
+let ws;
+let isConnected = false;
+
+// --------------------------------------------------
+// 1. UI要素の取得
+// --------------------------------------------------
+const timecodeDisplay = document.getElementById('timecode-display');
+const startBtn = document.getElementById('btn-start');
+const stopBtn = document.getElementById('btn-stop');
+const resetBtn = document.getElementById('btn-reset');
+const statusIndicator = document.getElementById('status-indicator');
+
+// 内部状態の保持
+let currentState = {
+    status: 'stopped', // 'running', 'stopped'
+    timecode: '00:00:00:00'
+};
+
+// --------------------------------------------------
+// 2. WebSocketの初期化と接続管理
+// --------------------------------------------------
+function initWebSocket() {
+    ws = new WebSocket(API_URL);
+
+    ws.onopen = () => {
+        isConnected = true;
+        updateStatusUI('Connected', 'var(--color-success, #28a745)');
+        console.log('WebSocket Connected');
+    };
+
+    ws.onmessage = (event) => {
+        try {
             const data = JSON.parse(event.data);
-            if (data.action === "sync") {
-                this.state = {
-                    running: data.state === "running",
-                    referenceUTC: data.reference_utc,
-                    baseFrames: data.base_frames,
-                    fps: data.fps,
-                    isDF: data.is_df
-                };
-                if (this.onSync) this.onSync();
-            }
-        };
-    }
-
-    getCurrentFrame() {
-        if (!this.state.running) return this.state.baseFrames;
-        const now = Date.now();
-        const diffMs = now - this.state.referenceUTC;
-        const diffFrames = Math.floor(diffMs * (this.state.fps / 1000));
-        return this.state.baseFrames + diffFrames;
-    }
-
-    formatTimecode(frames) {
-        const fpsRound = Math.round(this.state.fps);
-        let f = frames;
-
-        if (this.state.isDF && (fpsRound === 30 || fpsRound === 60)) {
-            const drop = fpsRound === 60 ? 4 : 2;
-            const totalMins = Math.floor(f / (fpsRound * 60));
-            f += drop * (totalMins - Math.floor(totalMins / 10));
+            handleServerMessage(data);
+        } catch (error) {
+            console.error('JSON Parse Error:', error);
         }
+    };
 
-        f = f % (fpsRound * 3600 * 24);
-        const pad = (n) => n.toString().padStart(2, '0');
+    ws.onclose = () => {
+        isConnected = false;
+        updateStatusUI('Disconnected', 'var(--color-danger, #dc3545)');
+        console.log('WebSocket Disconnected. Reconnecting in 3 seconds...');
+        // ネットワーク切断時やサーバー再起動時は3秒後に自動再接続
+        setTimeout(initWebSocket, 3000);
+    };
+
+    ws.onerror = (error) => {
+        console.error('WebSocket Error:', error);
+    };
+}
+
+// --------------------------------------------------
+// 3. メッセージ送受信のハンドリング
+// --------------------------------------------------
+/**
+ * サーバーから受信した同期データの処理
+ */
+function handleServerMessage(data) {
+    // Go言語側（main.go）から送られてくるJSON構造に合わせてマッピングします
+    // 例: { "action": "sync", "status": "running", "timecode": "00:01:23:14" }
+    if (data.action === 'sync' || data.timecode) {
+        currentState.status = data.status || currentState.status;
+        currentState.timecode = data.timecode || currentState.timecode;
         
-        const ff = f % fpsRound;
-        const s = Math.floor(f / fpsRound) % 60;
-        const m = Math.floor(f / (fpsRound * 60)) % 60;
-        const h = Math.floor(f / (fpsRound * 3600)) % 24;
-
-        const sep = this.state.isDF ? ';' : ':';
-        return `${pad(h)}:${pad(m)}:${pad(s)}${sep}${pad(ff)}`;
-    }
-
-    sendAction(stateName) {
-        const payload = {
-            action: "timer_action",
-            state: stateName,
-            reference_utc: Date.now(),
-            base_frames: this.getCurrentFrame(),
-            fps: this.state.fps,
-            is_df: this.state.isDF
-        };
-        this.socket.send(JSON.stringify(payload));
+        // 画面のタイムコード表示を即座に更新
+        if (timecodeDisplay) {
+            timecodeDisplay.textContent = currentState.timecode;
+        }
     }
 }
+
+/**
+ * サーバーへ操作コマンドを送信
+ */
+function sendCommand(actionName) {
+    if (!isConnected || ws.readyState !== WebSocket.OPEN) {
+        console.warn('WebSocket is not connected.');
+        return;
+    }
+
+    const payload = {
+        action: actionName,
+        timestamp: Date.now()
+    };
+    ws.send(JSON.stringify(payload));
+}
+
+// --------------------------------------------------
+// 4. UI更新とイベントバインディング
+// --------------------------------------------------
+function updateStatusUI(message, color) {
+    if (statusIndicator) {
+        statusIndicator.textContent = message;
+        statusIndicator.style.color = color;
+    }
+}
+
+function bindEvents() {
+    // ボタンが存在する画面（index.html）のみイベントを登録
+    if (startBtn) {
+        startBtn.addEventListener('click', () => sendCommand('start'));
+    }
+    if (stopBtn) {
+        stopBtn.addEventListener('click', () => sendCommand('stop'));
+    }
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => sendCommand('reset'));
+    }
+}
+
+// --------------------------------------------------
+// 5. 描画ループ (requestAnimationFrame)
+// --------------------------------------------------
+function animationLoop() {
+    // 現在の実装ではWebSocketのonmessageで直接DOMを更新していますが、
+    // ネットワークのジッター（遅延の揺らぎ）を吸収して、より滑らかな60fps描画を行う場合は、
+    // サーバーからの最終同期時刻と現在のローカル時刻の差分を計算して、ここで補間描画を行います。
+    
+    requestAnimationFrame(animationLoop);
+}
+
+// --------------------------------------------------
+// アプリケーション起動
+// --------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    initWebSocket();
+    bindEvents();
+    requestAnimationFrame(animationLoop);
+});
