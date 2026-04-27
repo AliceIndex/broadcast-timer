@@ -65,4 +65,5 @@ jobs:
         working-directory: ./infra
         run: |
           # 判定した環境名（dev or prod）を -c env に渡す
-          cdk deploy -c env=${{ steps.env-check.outputs.env_name }} --require-approval never --profile dev-profile
+          # CI環境（GitHub Actions）ではOIDCの環境変数を使うため --profile 指定は不要です
+          cdk deploy -c env=${{ steps.env-check.outputs.env_name }} --require-approval never
