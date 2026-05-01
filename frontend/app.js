@@ -1,5 +1,5 @@
 // デプロイ時に取得した本番環境のURL
-const API_URL = "wss://2cz26o6t9k.execute-api.ap-northeast-1.amazonaws.com/prod";
+const API_URL = "wss://h53oec3a75.execute-api.ap-northeast-1.amazonaws.com/dev";
 
 let ws;
 let isConnected = false;
@@ -65,7 +65,7 @@ function handleServerMessage(data) {
     if (data.action === 'sync' || data.timecode) {
         currentState.status = data.status || currentState.status;
         currentState.timecode = data.timecode || currentState.timecode;
-        
+
         // 画面のタイムコード表示を即座に更新
         if (timecodeDisplay) {
             timecodeDisplay.textContent = currentState.timecode;
@@ -119,7 +119,7 @@ function animationLoop() {
     // 現在の実装ではWebSocketのonmessageで直接DOMを更新していますが、
     // ネットワークのジッター（遅延の揺らぎ）を吸収して、より滑らかな60fps描画を行う場合は、
     // サーバーからの最終同期時刻と現在のローカル時刻の差分を計算して、ここで補間描画を行います。
-    
+
     requestAnimationFrame(animationLoop);
 }
 
