@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node.js (for CDK)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22' # 20から22に変更
 
       - name: Install AWS CDK
         run: npm install -g aws-cdk

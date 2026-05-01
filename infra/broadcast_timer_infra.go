@@ -6,10 +6,11 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapigatewayv2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsapigatewayv2integrations"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsdynamodb" // ← 【修正3】DynamoDB用のインポートを追加しました
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	"github.com/aws/constructs-go/constructs/v10"
-	"github.com/aws/jsii-runtime-go" // これが必要です
+	"github.com/aws/jsii-runtime-go"
 )
 
 type TimerStackProps struct {
@@ -64,6 +65,22 @@ func NewBroadcastTimerStack(scope constructs.Construct, id string, props *TimerS
 		Value: jsii.String(apiEndpoint),
 	})
 
+	// 【修正1】returnの前にDynamoDBの処理を移動しました
+	// DynamoDBテーブルの作成
+	connectionsTable := awsdynamodb.NewTable(stack, jsii.String("ConnectionsTable"), &awsdynamodb.TableProps{
+		PartitionKey: &awsdynamodb.Attribute{
+			Name: jsii.String("connectionId"),
+			Type: awsdynamodb.AttributeType_STRING,
+		},
+		BillingMode:   awsdynamodb.BillingMode_PAY_PER_REQUEST,
+		RemovalPolicy: awscdk.RemovalPolicy_DESTROY,
+	})
+
+	// 【修正2】権限と環境変数を渡す対象を "handler" に修正しました
+	connectionsTable.GrantFullAccess(handler)
+	handler.AddEnvironment(jsii.String("CONNECTIONS_TABLE"), connectionsTable.TableName(), nil)
+
+	// スタックの構築がすべて終わってから返す
 	return stack
 }
 
