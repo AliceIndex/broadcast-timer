@@ -1,12 +1,16 @@
-name: Deploy Broadcast Timer to AWS
+name: Deploy Broadcast Timer
 
 on:
   push:
     branches:
-      - main # mainブランチに変更があった時に実行
-      - develop # developブランチも監視対象に追加
+      - main
+      - develop
+    # 以下のフォルダやファイルに変更があった時だけActionを動かします
+    paths:
+      - 'backend/**'                       # Goのプログラムが変わった時
+      - 'infra/**'                         # CDKの設計図が変わった時
+      - '.github/workflows/deploy.yml'     # このAction自体の設定が変わった時
 
-# OIDC連携のために必要な権限設定
 permissions:
   id-token: write
   contents: read
