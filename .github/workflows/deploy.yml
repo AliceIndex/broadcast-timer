@@ -39,22 +39,16 @@ jobs:
       - name: Configure AWS Credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }} # 後で設定するIAMロールのARN
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: ap-northeast-1
 
       - name: Build Go Backend
         working-directory: ./backend
         run: |
           go mod tidy
-          chmod +x build.sh
-          ./build.sh
-
-      - name: Deploy Infrastructure via CDK
-        working-directory: ./infra
-        run: |
-          go mod tidy
-          # CI環境のため、確認プロンプトをスキップしてデプロイ
-          cdk deploy -c env=prod --require-approval never
+          # 先ほど解決したGLIBCエラー対策（静的ビルド）をここで確実に実行します
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bootstrap main.go
+          zip main.zip bootstrap
 
       - name: Determine Environment
         id: env-check
@@ -68,6 +62,6 @@ jobs:
       - name: Deploy via CDK
         working-directory: ./infra
         run: |
-          # 判定した環境名（dev or prod）を -c env に渡す
-          # CI環境（GitHub Actions）ではOIDCの環境変数を使うため --profile 指定は不要です
+          go mod tidy
+          # 判定した環境名（dev or prod）を -c env に渡して1回だけデプロイします
           cdk deploy -c env=${{ steps.env-check.outputs.env_name }} --require-approval never
