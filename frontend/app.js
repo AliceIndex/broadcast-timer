@@ -69,7 +69,7 @@ function handleServerMessage(data) { //[cite: 1]
     }
 }
 
-function sendCommand(actionName) { //[cite: 1]
+function sendCommand(actionName, state) { //[cite: 1]
     // ★ 1. まずボタンが反応しているかブラウザのコンソールに出す
     console.log("ボタンが押されました！ 送信しようとしているアクション:", actionName);
 
@@ -79,13 +79,17 @@ function sendCommand(actionName) { //[cite: 1]
         return;
     }
 
+    // Lambdaのテストケースで成功した「body」の中身と完全に一致させる
     const payload = {
-        action: actionName,
-        timestamp: Date.now()
+        "action": actionName, // ★ここがAPI Gatewayのルート判定に使われます
+        "state": state,
+        "reference_utc": Date.now(),
+        "base_frames": 0,
+        "fps": 30,
+        "is_df": false
     };
 
-    // ★ 3. 実際に投げる直前のデータを見せる
-    console.log("AWSに向けて送信します:", JSON.stringify(payload));
+    console.log("送信データ:", payload);
     ws.send(JSON.stringify(payload));
 }
 
@@ -102,13 +106,13 @@ function updateStatusUI(message, color) { //[cite: 1]
 function bindEvents() { //[cite: 1]
     // コントローラー画面のボタンイベント[cite: 1]
     if (startBtn) { //[cite: 1]
-        startBtn.addEventListener('click', () => sendCommand('start')); //[cite: 1]
+        startBtn.addEventListener('click', () => sendCommand('start', 'running')); //[cite: 1]
     }
     if (stopBtn) { //[cite: 1]
-        stopBtn.addEventListener('click', () => sendCommand('stop')); //[cite: 1]
+        stopBtn.addEventListener('click', () => sendCommand('stop', 'stopped')); //[cite: 1]
     }
     if (resetBtn) { //[cite: 1]
-        resetBtn.addEventListener('click', () => sendCommand('reset')); //[cite: 1]
+        resetBtn.addEventListener('click', () => sendCommand('reset', 'reset')); //[cite: 1]
     }
 
     // モニター画面専用：ダブルクリックでフルスクリーン切り替え[cite: 3]
