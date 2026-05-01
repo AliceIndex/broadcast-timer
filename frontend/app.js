@@ -70,16 +70,23 @@ function handleServerMessage(data) { //[cite: 1]
 }
 
 function sendCommand(actionName) { //[cite: 1]
-    if (!isConnected || ws.readyState !== WebSocket.OPEN) { //[cite: 1]
-        console.warn('WebSocket is not connected.'); //[cite: 1]
-        return; //[cite: 1]
+    // ★ 1. まずボタンが反応しているかブラウザのコンソールに出す
+    console.log("ボタンが押されました！ 送信しようとしているアクション:", actionName);
+
+    if (!isConnected || ws.readyState !== WebSocket.OPEN) {
+        // ★ 2. もし接続が原因で送れないなら、その理由を叫ぶ
+        console.warn('送信を中止しました: WebSocketがまだ繋がっていません。状態:', ws ? ws.readyState : '未定義');
+        return;
     }
 
-    const payload = { //[cite: 1]
-        action: actionName, //[cite: 1]
-        timestamp: Date.now() //[cite: 1]
+    const payload = {
+        action: actionName,
+        timestamp: Date.now()
     };
-    ws.send(JSON.stringify(payload)); //[cite: 1]
+
+    // ★ 3. 実際に投げる直前のデータを見せる
+    console.log("AWSに向けて送信します:", JSON.stringify(payload));
+    ws.send(JSON.stringify(payload));
 }
 
 // --------------------------------------------------
