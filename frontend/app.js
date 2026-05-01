@@ -85,7 +85,7 @@ function sendCommand(actionName, state) { //[cite: 1]
         "state": state,
         "reference_utc": Date.now(),
         "base_frames": 0,
-        "fps": 30,
+        "fps": 30.0,
         "is_df": false
     };
 
