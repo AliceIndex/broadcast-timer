@@ -1,0 +1,83 @@
+/* 共通スタイル */
+body {
+    margin: 0;
+    font-family: sans-serif;
+}
+
+/* =========================================
+   コントローラー画面 (index.html) のスタイル
+   ========================================= */
+.controller-body {
+    background: #222;
+    /*[cite: 2] */
+    color: #eee;
+    /*[cite: 2] */
+    padding: 2rem;
+    /*[cite: 2] */
+}
+
+.controller-body .panel {
+    background: #333;
+    /*[cite: 2] */
+    padding: 1rem;
+    /*[cite: 2] */
+    border-radius: 8px;
+    /*[cite: 2] */
+    max-width: 400px;
+    /*[cite: 2] */
+    margin: auto;
+    /*[cite: 2] */
+}
+
+.controller-body button {
+    padding: 10px 20px;
+    /*[cite: 2] */
+    font-size: 1.2rem;
+    /*[cite: 2] */
+    cursor: pointer;
+    /*[cite: 2] */
+    margin: 5px;
+    /*[cite: 2] */
+}
+
+.controller-body .timecode {
+    font-size: 3rem;
+    /*[cite: 2] */
+    font-family: monospace;
+    /*[cite: 2] */
+    text-align: center;
+    /*[cite: 2] */
+    margin-bottom: 20px;
+    /*[cite: 2] */
+}
+
+/* =========================================
+   モニター画面 (monitor.html) のスタイル
+   ========================================= */
+.monitor-body {
+    background-color: #000;
+    /* */
+    color: #fff;
+    /*[cite: 3] */
+    display: flex;
+    /*[cite: 3] */
+    justify-content: center;
+    /*[cite: 3] */
+    align-items: center;
+    /*[cite: 3] */
+    height: 100vh;
+    /*[cite: 3] */
+    font-family: 'Courier New', Courier, monospace;
+    /*[cite: 3] */
+    overflow: hidden;
+    /*[cite: 3] */
+    cursor: none;
+    /* 現場でのマウス映り込み防止[cite: 3] */
+}
+
+.monitor-body #timecode-display {
+    font-size: 18vw;
+    /*[cite: 3] */
+    font-variant-numeric: tabular-nums;
+    /*[cite: 3] */
+}

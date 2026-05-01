@@ -1,71 +1,30 @@
 <!DOCTYPE html>
-<html lang="ja">
-
+<html lang="ja"> <!--[cite: 2] -->
 <head>
-    <meta charset="UTF-8">
-    <title>Controller - Broadcast Timer</title>
-    <style>
-        body {
-            background: #222;
-            color: #eee;
-            font-family: sans-serif;
-            padding: 2rem;
-        }
-
-        .panel {
-            background: #333;
-            padding: 1rem;
-            border-radius: 8px;
-            max-width: 400px;
-            margin: auto;
-        }
-
-        button {
-            padding: 10px 20px;
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin: 5px;
-        }
-
-        .timecode {
-            font-size: 3rem;
-            font-family: monospace;
-            text-align: center;
-            margin-bottom: 20px;
-        }
-    </style>
+    <meta charset="UTF-8"> <!--[cite: 2] -->
+    <title>Controller - Broadcast Timer</title> <!--[cite: 2] -->
+    <!-- 共通スタイルシートを読み込み -->
+    <link rel="stylesheet" href="style.css">
 </head>
-
-<body>
-    <div class="panel">
-        <div class="timecode" id="preview">00:00:00:00</div>
-        <div style="text-align: center;">
-            <button onclick="timerApp.sendAction('running')">START</button>
-            <button onclick="timerApp.sendAction('stopped')">STOP</button>
-            <button onclick="resetTimer()">RESET</button>
+<body class="controller-body">
+    <div class="panel"> <!--[cite: 2] -->
+        <!-- IDを app.js に合わせて修正 -->
+        <div class="timecode" id="timecode-display">00:00:00:00</div>
+        
+        <div style="text-align: center;"> <!--[cite: 2] -->
+            <!-- イベント処理は app.js 側で行うため、idのみ付与 -->
+            <button id="btn-start">START</button>
+            <button id="btn-stop">STOP</button>
+            <button id="btn-reset">RESET</button>
         </div>
         <hr>
-        <button onclick="window.open('monitor.html', '_blank', 'width=800,height=600')">表示モニターを開く</button>
+        <button onclick="window.open('monitor.html', '_blank', 'width=800,height=600')">表示モニターを開く</button> <!--[cite: 2] -->
+        
+        <!-- 接続ステータス表示（任意） -->
+        <div id="status-indicator" style="text-align: center; margin-top: 15px; font-weight: bold;"></div>
     </div>
 
-    <script src="app.js"></script>
-    <script>
-        const API_URL = "wss://YOUR_API_ID.execute-api.REGION.amazonaws.com/prod";
-        const previewEl = document.getElementById('preview');
-        const timerApp = new BroadcastTimer(API_URL);
-
-        function updatePreview() {
-            previewEl.innerText = timerApp.formatTimecode(timerApp.getCurrentFrame());
-            requestAnimationFrame(updatePreview);
-        }
-
-        function resetTimer() {
-            timerApp.state.baseFrames = 0;
-            timerApp.sendAction('reset');
-        }
-
-        requestAnimationFrame(updatePreview);
-    </script>
+    <!-- 統合したJSファイルを読み込み -->
+    <script src="app.js"></script> <!--[cite: 2] -->
 </body>
-
 </html>

@@ -1,133 +1,128 @@
 // デプロイ時に取得した本番環境のURL
-const API_URL = "wss://2cz26o6t9k.execute-api.ap-northeast-1.amazonaws.com/prod";
+const API_URL = "wss://2cz26o6t9k.execute-api.ap-northeast-1.amazonaws.com/prod"; //[cite: 1]
 
-let ws;
-let isConnected = false;
+let ws; //[cite: 1]
+let isConnected = false; //[cite: 1]
 
 // --------------------------------------------------
-// 1. UI要素の取得
+// 1. UI要素の取得[cite: 1]
 // --------------------------------------------------
-const timecodeDisplay = document.getElementById('timecode-display');
-const startBtn = document.getElementById('btn-start');
-const stopBtn = document.getElementById('btn-stop');
-const resetBtn = document.getElementById('btn-reset');
-const statusIndicator = document.getElementById('status-indicator');
+// index.html と monitor.html の両方でこのIDを使用します
+const timecodeDisplay = document.getElementById('timecode-display'); //[cite: 1]
+const startBtn = document.getElementById('btn-start'); //[cite: 1]
+const stopBtn = document.getElementById('btn-stop'); //[cite: 1]
+const resetBtn = document.getElementById('btn-reset'); //[cite: 1]
+const statusIndicator = document.getElementById('status-indicator'); //[cite: 1]
 
-// 内部状態の保持
-let currentState = {
-    status: 'stopped', // 'running', 'stopped'
-    timecode: '00:00:00:00'
+// 内部状態の保持[cite: 1]
+let currentState = { //[cite: 1]
+    status: 'stopped', // 'running', 'stopped'[cite: 1]
+    timecode: '00:00:00:00' //[cite: 1]
 };
 
 // --------------------------------------------------
-// 2. WebSocketの初期化と接続管理
+// 2. WebSocketの初期化と接続管理[cite: 1]
 // --------------------------------------------------
-function initWebSocket() {
-    ws = new WebSocket(API_URL);
+function initWebSocket() { //[cite: 1]
+    ws = new WebSocket(API_URL); //[cite: 1]
 
-    ws.onopen = () => {
-        isConnected = true;
-        updateStatusUI('Connected', 'var(--color-success, #28a745)');
-        console.log('WebSocket Connected');
+    ws.onopen = () => { //[cite: 1]
+        isConnected = true; //[cite: 1]
+        updateStatusUI('Connected', 'var(--color-success, #28a745)'); //[cite: 1]
+        console.log('WebSocket Connected'); //[cite: 1]
     };
 
-    ws.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
-            handleServerMessage(data);
-        } catch (error) {
-            console.error('JSON Parse Error:', error);
+    ws.onmessage = (event) => { //[cite: 1]
+        try { //[cite: 1]
+            const data = JSON.parse(event.data); //[cite: 1]
+            handleServerMessage(data); //[cite: 1]
+        } catch (error) { //[cite: 1]
+            console.error('JSON Parse Error:', error); //[cite: 1]
         }
     };
 
-    ws.onclose = () => {
-        isConnected = false;
-        updateStatusUI('Disconnected', 'var(--color-danger, #dc3545)');
-        console.log('WebSocket Disconnected. Reconnecting in 3 seconds...');
-        // ネットワーク切断時やサーバー再起動時は3秒後に自動再接続
-        setTimeout(initWebSocket, 3000);
+    ws.onclose = () => { //[cite: 1]
+        isConnected = false; //[cite: 1]
+        updateStatusUI('Disconnected', 'var(--color-danger, #dc3545)'); //[cite: 1]
+        console.log('WebSocket Disconnected. Reconnecting in 3 seconds...'); //[cite: 1]
+        // ネットワーク切断時やサーバー再起動時は3秒後に自動再接続[cite: 1]
+        setTimeout(initWebSocket, 3000); //[cite: 1]
     };
 
-    ws.onerror = (error) => {
-        console.error('WebSocket Error:', error);
+    ws.onerror = (error) => { //[cite: 1]
+        console.error('WebSocket Error:', error); //[cite: 1]
     };
 }
 
 // --------------------------------------------------
-// 3. メッセージ送受信のハンドリング
+// 3. メッセージ送受信のハンドリング[cite: 1]
 // --------------------------------------------------
-/**
- * サーバーから受信した同期データの処理
- */
-function handleServerMessage(data) {
-    // Go言語側（main.go）から送られてくるJSON構造に合わせてマッピングします
-    // 例: { "action": "sync", "status": "running", "timecode": "00:01:23:14" }
-    if (data.action === 'sync' || data.timecode) {
-        currentState.status = data.status || currentState.status;
-        currentState.timecode = data.timecode || currentState.timecode;
+function handleServerMessage(data) { //[cite: 1]
+    if (data.action === 'sync' || data.timecode) { //[cite: 1]
+        currentState.status = data.status || currentState.status; //[cite: 1]
+        currentState.timecode = data.timecode || currentState.timecode; //[cite: 1]
 
-        // 画面のタイムコード表示を即座に更新
-        if (timecodeDisplay) {
-            timecodeDisplay.textContent = currentState.timecode;
+        // 画面のタイムコード表示を即座に更新[cite: 1]
+        if (timecodeDisplay) { //[cite: 1]
+            timecodeDisplay.textContent = currentState.timecode; //[cite: 1]
         }
     }
 }
 
-/**
- * サーバーへ操作コマンドを送信
- */
-function sendCommand(actionName) {
-    if (!isConnected || ws.readyState !== WebSocket.OPEN) {
-        console.warn('WebSocket is not connected.');
-        return;
+function sendCommand(actionName) { //[cite: 1]
+    if (!isConnected || ws.readyState !== WebSocket.OPEN) { //[cite: 1]
+        console.warn('WebSocket is not connected.'); //[cite: 1]
+        return; //[cite: 1]
     }
 
-    const payload = {
-        action: actionName,
-        timestamp: Date.now()
+    const payload = { //[cite: 1]
+        action: actionName, //[cite: 1]
+        timestamp: Date.now() //[cite: 1]
     };
-    ws.send(JSON.stringify(payload));
+    ws.send(JSON.stringify(payload)); //[cite: 1]
 }
 
 // --------------------------------------------------
-// 4. UI更新とイベントバインディング
+// 4. UI更新とイベントバインディング[cite: 1]
 // --------------------------------------------------
-function updateStatusUI(message, color) {
-    if (statusIndicator) {
-        statusIndicator.textContent = message;
-        statusIndicator.style.color = color;
+function updateStatusUI(message, color) { //[cite: 1]
+    if (statusIndicator) { //[cite: 1]
+        statusIndicator.textContent = message; //[cite: 1]
+        statusIndicator.style.color = color; //[cite: 1]
     }
 }
 
-function bindEvents() {
-    // ボタンが存在する画面（index.html）のみイベントを登録
-    if (startBtn) {
-        startBtn.addEventListener('click', () => sendCommand('start'));
+function bindEvents() { //[cite: 1]
+    // コントローラー画面のボタンイベント[cite: 1]
+    if (startBtn) { //[cite: 1]
+        startBtn.addEventListener('click', () => sendCommand('start')); //[cite: 1]
     }
-    if (stopBtn) {
-        stopBtn.addEventListener('click', () => sendCommand('stop'));
+    if (stopBtn) { //[cite: 1]
+        stopBtn.addEventListener('click', () => sendCommand('stop')); //[cite: 1]
     }
-    if (resetBtn) {
-        resetBtn.addEventListener('click', () => sendCommand('reset'));
+    if (resetBtn) { //[cite: 1]
+        resetBtn.addEventListener('click', () => sendCommand('reset')); //[cite: 1]
     }
+
+    // モニター画面専用：ダブルクリックでフルスクリーン切り替え[cite: 3]
+    window.addEventListener('dblclick', () => { //[cite: 3]
+        if (!document.fullscreenElement) { //[cite: 3]
+            document.documentElement.requestFullscreen(); //[cite: 3]
+            if (navigator.wakeLock) {
+                navigator.wakeLock.request('screen').catch(console.error); // スリープ防止[cite: 3]
+            }
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen(); //[cite: 3]
+            }
+        }
+    });
 }
 
 // --------------------------------------------------
-// 5. 描画ループ (requestAnimationFrame)
+// アプリケーション起動[cite: 1]
 // --------------------------------------------------
-function animationLoop() {
-    // 現在の実装ではWebSocketのonmessageで直接DOMを更新していますが、
-    // ネットワークのジッター（遅延の揺らぎ）を吸収して、より滑らかな60fps描画を行う場合は、
-    // サーバーからの最終同期時刻と現在のローカル時刻の差分を計算して、ここで補間描画を行います。
-
-    requestAnimationFrame(animationLoop);
-}
-
-// --------------------------------------------------
-// アプリケーション起動
-// --------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
-    initWebSocket();
-    bindEvents();
-    requestAnimationFrame(animationLoop);
+document.addEventListener('DOMContentLoaded', () => { //[cite: 1]
+    initWebSocket(); //[cite: 1]
+    bindEvents(); //[cite: 1]
 });
