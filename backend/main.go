@@ -24,9 +24,9 @@ type ActionMessage struct {
 }
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	// ★ ここが目印になります！
-	fmt.Println("=== LAMBDA INVOKED ===")
-	fmt.Printf("種類: %s | ID: %s\n", req.RequestContext.EventType, req.RequestContext.ConnectionID)
+	// ★ステップ1：Lambdaが起動したか？
+	fmt.Println("=== [DEBUG 1] Lambda起動！ ===")
+	fmt.Printf("EventType: %s | ConnectionID: %s\n", req.RequestContext.EventType, req.RequestContext.ConnectionID)
 
 	tableName := os.Getenv("CONNECTIONS_TABLE")
 	sess := session.Must(session.NewSession())
@@ -61,13 +61,23 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
+	// ==========================================
 	// 3. メッセージ受信時 (STARTボタンを押した時の処理)
-	fmt.Println("[MESSAGE] 受信データ:", req.Body)
+	// ==========================================
+
+	// ★ステップ2：生データは届いているか？
+	fmt.Println("=== [DEBUG 2] メッセージ受信ルート到達 ===")
+	fmt.Println("ブラウザから届いた生のJSON:", req.Body)
+
 	var msg ActionMessage
 	if err := json.Unmarshal([]byte(req.Body), &msg); err != nil {
-		fmt.Println("[MESSAGE ERROR] JSON変換失敗:", err)
+		// ★ステップ3-A：型のエラーなどで変換失敗した場合
+		fmt.Printf("=== [DEBUG 3-A ❌] JSONの変換に失敗しました！ 理由: %v\n", err)
 		return events.APIGatewayProxyResponse{StatusCode: 400}, nil
 	}
+
+	// ★ステップ3-B：変換成功！
+	fmt.Printf("=== [DEBUG 3-B ✅] JSON変換成功！ アクション: %s, 状態: %s\n", msg.Action, msg.State)
 
 	msg.Action = "sync"
 	responseData, _ := json.Marshal(msg)
@@ -75,19 +85,19 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	endpoint := fmt.Sprintf("https://%s/%s", req.RequestContext.DomainName, req.RequestContext.Stage)
 	apigw := apigatewaymanagementapi.New(sess, aws.NewConfig().WithEndpoint(endpoint))
 
-	fmt.Println("[MESSAGE] データベースから全員のリストを取得します...")
+	fmt.Println("=== [DEBUG 4] データベースから全員のリストを取得します... ===")
 	scanOut, err := db.Scan(&dynamodb.ScanInput{
 		TableName: aws.String(tableName),
 	})
 	if err != nil {
-		fmt.Println("[MESSAGE ERROR] リスト取得失敗:", err)
+		fmt.Printf("=== [DEBUG 4 ❌] DB読み込み失敗: %v ===\n", err)
 		return events.APIGatewayProxyResponse{StatusCode: 500}, err
 	}
 
 	successCount := 0
 	for _, item := range scanOut.Items {
 		targetID := *item["connectionId"].S
-		fmt.Println("[MESSAGE] 送信先:", targetID)
+		fmt.Println("=== [DEBUG 5] 送信先:", targetID, "===")
 		
 		_, err := apigw.PostToConnection(&apigatewaymanagementapi.PostToConnectionInput{
 			ConnectionId: aws.String(targetID),
@@ -95,7 +105,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		})
 		
 		if err != nil {
-			fmt.Println("[MESSAGE ERROR] 送信失敗。名簿から削除します 理由:", err)
+			fmt.Println("=== [DEBUG 5 ❌] 送信失敗。名簿から削除します 理由:", err, "===")
 			db.DeleteItem(&dynamodb.DeleteItemInput{
 				TableName: aws.String(tableName),
 				Key: map[string]*dynamodb.AttributeValue{
@@ -107,7 +117,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		}
 	}
 	
-	fmt.Printf("[MESSAGE SUCCESS] 全 %d 台への一斉送信完了！\n", successCount)
+	fmt.Printf("=== [DEBUG 6 ✅] 全 %d 台への一斉送信完了！ ===\n", successCount)
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }
 
