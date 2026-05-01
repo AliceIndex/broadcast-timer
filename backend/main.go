@@ -24,43 +24,48 @@ type ActionMessage struct {
 }
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	// 環境変数からDynamoDBのテーブル名を取得
+	// ★ ここが目印になります！
+	fmt.Println("=== LAMBDA INVOKED ===")
+	fmt.Printf("種類: %s | ID: %s\n", req.RequestContext.EventType, req.RequestContext.ConnectionID)
+
 	tableName := os.Getenv("CONNECTIONS_TABLE")
 	sess := session.Must(session.NewSession())
 	db := dynamodb.New(sess)
 
-	connectionID := req.RequestContext.ConnectionID
-	eventType := req.RequestContext.EventType
-
-	// 1. 新規接続時：名簿（DynamoDB）にIDを記録
-	if eventType == "CONNECT" {
+	// 1. 接続時の処理
+	if req.RequestContext.EventType == "CONNECT" {
+		fmt.Println("[CONNECT] データベースにIDを登録します...")
 		_, err := db.PutItem(&dynamodb.PutItemInput{
 			TableName: aws.String(tableName),
 			Item: map[string]*dynamodb.AttributeValue{
-				"connectionId": {S: aws.String(connectionID)},
+				"connectionId": {S: aws.String(req.RequestContext.ConnectionID)},
 			},
 		})
 		if err != nil {
-			fmt.Println("Connect DB Error:", err)
+			fmt.Println("[CONNECT ERROR] 登録失敗:", err)
 			return events.APIGatewayProxyResponse{StatusCode: 500}, err
 		}
+		fmt.Println("[CONNECT SUCCESS] 登録完了！")
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
-	// 2. 切断時：名簿からIDを削除
-	if eventType == "DISCONNECT" {
+	// 2. 切断時の処理
+	if req.RequestContext.EventType == "DISCONNECT" {
+		fmt.Println("[DISCONNECT] データベースからIDを削除します...")
 		_, _ = db.DeleteItem(&dynamodb.DeleteItemInput{
 			TableName: aws.String(tableName),
 			Key: map[string]*dynamodb.AttributeValue{
-				"connectionId": {S: aws.String(connectionID)},
+				"connectionId": {S: aws.String(req.RequestContext.ConnectionID)},
 			},
 		})
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
-	// 3. メッセージ受信時：全員にブロードキャスト
+	// 3. メッセージ受信時 (STARTボタンを押した時の処理)
+	fmt.Println("[MESSAGE] 受信データ:", req.Body)
 	var msg ActionMessage
 	if err := json.Unmarshal([]byte(req.Body), &msg); err != nil {
+		fmt.Println("[MESSAGE ERROR] JSON変換失敗:", err)
 		return events.APIGatewayProxyResponse{StatusCode: 400}, nil
 	}
 
@@ -70,34 +75,39 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	endpoint := fmt.Sprintf("https://%s/%s", req.RequestContext.DomainName, req.RequestContext.Stage)
 	apigw := apigatewaymanagementapi.New(sess, aws.NewConfig().WithEndpoint(endpoint))
 
-	// 名簿（DynamoDB）から現在繋がっている全員のIDを取得
+	fmt.Println("[MESSAGE] データベースから全員のリストを取得します...")
 	scanOut, err := db.Scan(&dynamodb.ScanInput{
 		TableName: aws.String(tableName),
 	})
 	if err != nil {
-		fmt.Println("DB Scan Error:", err)
+		fmt.Println("[MESSAGE ERROR] リスト取得失敗:", err)
 		return events.APIGatewayProxyResponse{StatusCode: 500}, err
 	}
 
-	// 全員に向けてループ送信
+	successCount := 0
 	for _, item := range scanOut.Items {
 		targetID := *item["connectionId"].S
+		fmt.Println("[MESSAGE] 送信先:", targetID)
+		
 		_, err := apigw.PostToConnection(&apigatewaymanagementapi.PostToConnectionInput{
 			ConnectionId: aws.String(targetID),
 			Data:         responseData,
 		})
-		// 送信失敗（既にブラウザを閉じている等）の場合は名簿から削除
+		
 		if err != nil {
-			fmt.Printf("Stale connection removed: %s\n", targetID)
+			fmt.Println("[MESSAGE ERROR] 送信失敗。名簿から削除します 理由:", err)
 			db.DeleteItem(&dynamodb.DeleteItemInput{
 				TableName: aws.String(tableName),
 				Key: map[string]*dynamodb.AttributeValue{
 					"connectionId": {S: aws.String(targetID)},
 				},
 			})
+		} else {
+			successCount++
 		}
 	}
-
+	
+	fmt.Printf("[MESSAGE SUCCESS] 全 %d 台への一斉送信完了！\n", successCount)
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }
 
