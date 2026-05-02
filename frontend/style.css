@@ -1,84 +1,158 @@
-/* 共通スタイル */
+/* =========================================
+   共通・基本スタイル
+   ========================================= */
+:root {
+    --primary-color: #007bff;
+    --primary-hover: #0056b3;
+    --bg-entry: #f8f9fa;
+    --bg-controller: #222;
+    --bg-monitor: #000;
+    --panel-bg: #333;
+    --text-light: #eee;
+    --border-color: #dee2e6;
+}
+
 body {
     margin: 0;
-    font-family: sans-serif;
+    font-family: 'JetBrains Mono', 'Source Code Pro', sans-serif;
 }
 
 /* =========================================
-   コントローラー画面 (index.html) のスタイル
+   ルーム選択画面 (index.html) のスタイル
+   ========================================= */
+.entry-body {
+    background-color: var(--bg-entry);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    color: #212529;
+}
+
+.entry-body .container {
+    width: 100%;
+    max-width: 400px;
+    padding: 20px;
+    text-align: center;
+}
+
+.entry-body .card {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.entry-body .divider {
+    margin: 1.5rem 0;
+    font-size: 0.8rem;
+    color: #6c757d;
+    position: relative;
+}
+
+.entry-body .input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+}
+
+.entry-body input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+}
+
+.entry-body button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.entry-body .btn-primary { background: var(--primary-color); color: white; }
+.entry-body .btn-secondary { background: #6c757d; color: white; }
+
+/* =========================================
+   コントローラー画面 (timer.html / controller)
    ========================================= */
 .controller-body {
-    background: #222;
-    /*[cite: 2] */
-    color: #eee;
-    /*[cite: 2] */
+    background: var(--bg-controller);
+    color: var(--text-light);
     padding: 2rem;
-    /*[cite: 2] */
+    min-height: 100vh;
 }
 
 .controller-body .panel {
-    background: #333;
-    /*[cite: 2] */
-    padding: 1rem;
-    /*[cite: 2] */
-    border-radius: 8px;
-    /*[cite: 2] */
-    max-width: 400px;
-    /*[cite: 2] */
+    background: var(--panel-bg);
+    padding: 1.5rem;
+    border-radius: 12px;
+    max-width: 500px;
     margin: auto;
-    /*[cite: 2] */
-}
-
-.controller-body button {
-    padding: 10px 20px;
-    /*[cite: 2] */
-    font-size: 1.2rem;
-    /*[cite: 2] */
-    cursor: pointer;
-    /*[cite: 2] */
-    margin: 5px;
-    /*[cite: 2] */
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
 .controller-body .timecode {
-    font-size: 3rem;
-    /*[cite: 2] */
-    font-family: monospace;
-    /*[cite: 2] */
+    font-size: 3.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
     text-align: center;
-    /*[cite: 2] */
-    margin-bottom: 20px;
-    /*[cite: 2] */
+    margin-bottom: 25px;
+    color: #00ff00; /* プロ機材っぽく緑に */
+    text-shadow: 0 0 10px rgba(0,255,0,0.3);
+}
+
+.controller-body button {
+    padding: 12px 24px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 5px;
+    border-radius: 6px;
+    border: none;
+    transition: opacity 0.2s;
+}
+
+.controller-body button:hover { opacity: 0.8; }
+
+.controller-body .btn-start { background: #28a745; color: white; }
+.controller-body .btn-stop  { background: #dc3545; color: white; }
+.controller-body .btn-reset { background: #6c757d; color: white; }
+
+/* ルーム情報表示用 */
+.controller-body .room-info {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.9rem;
+    color: #aaa;
 }
 
 /* =========================================
    モニター画面 (monitor.html) のスタイル
    ========================================= */
 .monitor-body {
-    background-color: #000;
-    /* */
+    background-color: var(--bg-monitor);
     color: #fff;
-    /*[cite: 3] */
     display: flex;
-    /*[cite: 3] */
     justify-content: center;
-    /*[cite: 3] */
     align-items: center;
-    /*[cite: 3] */
     height: 100vh;
-    /*[cite: 3] */
-    font-family: 'Courier New', Courier, monospace;
-    /*[cite: 3] */
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
     overflow: hidden;
-    /*[cite: 3] */
-    cursor: none;
-    /* 現場でのマウス映り込み防止[cite: 3] */
+    cursor: none; /* マウス映り込み防止 */
     padding: 10px;
 }
 
 .monitor-body #timecode-display {
-    font-size: 10vw;
-    /*[cite: 3] */
+    font-size: 18vw; /* より大きく視認性アップ */
     font-variant-numeric: tabular-nums;
-    /*[cite: 3] */
+    font-weight: bold;
 }
