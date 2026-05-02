@@ -80,6 +80,20 @@ func NewBroadcastTimerStack(scope constructs.Construct, id string, props *TimerS
 	connectionsTable.GrantFullAccess(handler)
 	handler.AddEnvironment(jsii.String("CONNECTIONS_TABLE"), connectionsTable.TableName(), nil)
 
+	// --- 追加：ルーム状態管理用のDynamoDBテーブル ---
+	roomStatesTable := awsdynamodb.NewTable(stack, jsii.String("RoomStatesTable"), &awsdynamodb.TableProps{
+		PartitionKey: &awsdynamodb.Attribute{
+			Name: jsii.String("room_id"), // 部屋番号をキーにする
+			Type: awsdynamodb.AttributeType_STRING,
+		},
+		BillingMode:   awsdynamodb.BillingMode_PAY_PER_REQUEST,[cite: 2]
+		RemovalPolicy: awscdk.RemovalPolicy_DESTROY,[cite: 2]
+	})
+
+	// Lambda (handler) に新しいテーブルの権限と環境変数を付与
+	roomStatesTable.GrantFullAccess(handler)
+	handler.AddEnvironment(jsii.String("ROOM_STATES_TABLE"), roomStatesTable.TableName(), nil)
+
 	// スタックの構築がすべて終わってから返す
 	return stack
 }

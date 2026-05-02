@@ -4,6 +4,7 @@ const API_URL = "wss://2cz26o6t9k.execute-api.ap-northeast-1.amazonaws.com/prod"
 
 let ws; //[cite: 1]
 let isConnected = false; //[cite: 1]
+let isManualClose = false; //[cite: 1]
 
 // --------------------------------------------------
 // 1. UI要素の取得[cite: 1]
@@ -51,7 +52,7 @@ function initWebSocket() { //[cite: 1]
         isConnected = true; //[cite: 1]
         updateStatusUI('Connected', 'var(--color-success, #28a745)'); //[cite: 1]
         console.log('WebSocket Connected'); //[cite: 1]
-        
+
         // ★入室（または作成）をサーバーに知らせる
         const joinPayload = {
             action: "join",
@@ -73,10 +74,12 @@ function initWebSocket() { //[cite: 1]
 
     ws.onclose = () => { //[cite: 1]
         isConnected = false; //[cite: 1]
-        updateStatusUI('Disconnected', 'var(--color-danger, #dc3545)'); //[cite: 1]
-        console.log('WebSocket Disconnected. Reconnecting in 3 seconds...'); //[cite: 1]
-        // ネットワーク切断時やサーバー再起動時は3秒後に自動再接続[cite: 1]
-        setTimeout(initWebSocket, 3000); //[cite: 1]
+        if (!isManualClose) { //[cite: 1]
+            updateStatusUI('Disconnected', 'var(--color-danger, #dc3545)'); //[cite: 1]
+            console.log('WebSocket Disconnected. Reconnecting in 3 seconds...'); //[cite: 1]
+            // ネットワーク切断時やサーバー再起動時は3秒後に自動再接続[cite: 1]
+            setTimeout(initWebSocket, 3000); //[cite: 1]
+        }
     };
 
     ws.onerror = (error) => { //[cite: 1]
@@ -94,11 +97,11 @@ function handleServerMessage(data) {
     if (data.action === 'sync' || data.timecode) {
         currentState.state = data.state || currentState.state;
         currentState.reference_utc = data.reference_utc || currentState.reference_utc;
-        
+
         // ★サーバーから配られた「設定」と「下駄（base_frames）」を保存
         currentState.fps = data.fps || 30.0;
         currentState.is_df = data.is_df || false;
-        currentState.base_frames = data.base_frames || 0; 
+        currentState.base_frames = data.base_frames || 0;
 
         if (currentState.state === 'running') {
             startClockMotor();
@@ -123,10 +126,10 @@ function startClockMotor() {
     clockInterval = setInterval(() => {
         // 1. スタートしてから何ミリ秒経ったか
         const elapsedMs = Date.now() - currentState.reference_utc;
-        
+
         // 2. そのミリ秒をフレーム数に変換
         const elapsedFrames = Math.floor(elapsedMs * currentState.fps / 1000);
-        
+
         // 3. ★「配られた下駄(base_frames)」＋「経過フレーム数」
         const totalFrames = currentState.base_frames + elapsedFrames;
 
@@ -295,6 +298,47 @@ function openMonitorWindow() {
     window.open(monitorUrl, '_blank', 'width=800,height=600');
 }
 
+/**
+ * モーダルを表示する
+ */
+function showLeaveModal() {
+    document.getElementById('leave-modal').style.display = 'flex';
+}
+
+/**
+ * モーダルを閉じる
+ */
+function hideLeaveModal() {
+    document.getElementById('leave-modal').style.display = 'none';
+}
+
+/**
+ * 実際に退出・切断を実行する
+ */
+function executeLeave() {
+    // 1. サーバーへ退出を通知（任意ですが、サーバー側で即時名簿から消せるため推奨）
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+            action: "leave",
+            room_id: roomID
+        }));
+    }
+
+    // 2. WebSocketを完全に切断する
+    if (ws) {
+        isManualClose = true; // フラグを立てて自動再接続を防止
+        ws.close();
+        console.log("WebSocket connection closed by user.");
+    }
+
+    // 3. モーター停止と画面リセット
+    stopClockMotor();
+    hideLeaveModal();
+
+    // 4. ルーム選択画面へ遷移
+    window.location.href = "index.html";
+}
+
 // --------------------------------------------------
 // アプリケーション起動[cite: 1]
 // --------------------------------------------------
@@ -302,3 +346,4 @@ document.addEventListener('DOMContentLoaded', () => { //[cite: 1]
     initWebSocket(); //[cite: 1]
     bindEvents(); //[cite: 1]
 });
+

@@ -30,17 +30,20 @@ body {
 }
 
 .entry-body .container {
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    max-width: 400px;
+    max-width: 80vw;
     padding: 20px;
     text-align: center;
 }
 
 .entry-body .card {
+    justify-items: center;
     background: white;
     padding: 2rem;
     border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     margin-bottom: 1.5rem;
     border: 1px solid var(--border-color);
 }
@@ -54,8 +57,12 @@ body {
 
 .entry-body .input-group {
     display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 10px;
     margin-bottom: 1.5rem;
+    max-width: 20rem;
 }
 
 .entry-body input {
@@ -69,7 +76,7 @@ body {
 }
 
 .entry-body button {
-    width: 100%;
+    width: 50%;
     padding: 12px;
     border: none;
     border-radius: 8px;
@@ -78,8 +85,15 @@ body {
     transition: 0.2s;
 }
 
-.entry-body .btn-primary { background: var(--primary-color); color: white; }
-.entry-body .btn-secondary { background: #6c757d; color: white; }
+.entry-body .btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.entry-body .btn-secondary {
+    background: #6c757d;
+    color: white;
+}
 
 /* =========================================
    コントローラー画面 (timer.html / controller)
@@ -87,8 +101,12 @@ body {
 .controller-body {
     background: var(--bg-controller);
     color: var(--text-light);
-    padding: 2rem;
-    min-height: 100vh;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .controller-body .panel {
@@ -96,19 +114,33 @@ body {
     padding: 1.5rem;
     border-radius: 12px;
     max-width: 500px;
-    margin: auto;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
 }
 
 .controller-body .timecode {
     font-size: 3.5rem;
     text-align: center;
-    margin-bottom: 25px;
     color: #ffffff;
-   /* モニターと同様に全角化と等幅フォントを適用 */
+    /* モニターと同様に全角化と等幅フォントを適用 */
     text-transform: full-width;
     font-family: "Courier New", Courier, monospace;
-    text-shadow: 0 0 10px rgba(0,255,0,0.3);
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+.controller-body .timecode label {
+    margin-right: 15px;
+}
+
+.controller-body .button-group {
+    display: flex;
+    gap: 15px;
+    padding: 10px;
 }
 
 .controller-body button {
@@ -116,24 +148,116 @@ body {
     font-size: 1.1rem;
     font-weight: bold;
     cursor: pointer;
-    margin: 5px;
     border-radius: 6px;
     border: none;
     transition: opacity 0.2s;
 }
 
-.controller-body button:hover { opacity: 0.8; }
+.controller-body button:hover {
+    opacity: 0.8;
+}
 
-.controller-body .btn-start { background: #28a745; color: white; }
-.controller-body .btn-stop  { background: #dc3545; color: white; }
-.controller-body .btn-reset { background: #6c757d; color: white; }
+.controller-body .btn-start {
+    background: #28a745;
+    color: white;
+}
+
+.controller-body .btn-stop {
+    background: #dc3545;
+    color: white;
+}
+
+.controller-body .btn-reset {
+    background: #6c757d;
+    color: white;
+}
+
+.controller-body .settings-panel {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--panel-bg);
+    padding: 1rem;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.controller-body .settings-panel input {
+    font-size: 1.2rem;
+    padding: 5px;
+    width: 140px;
+    text-align: center;
+}
+
+.controller-body .settings-panel select {
+    font-size: 1.2rem;
+    padding: 5px;
+    width: 160px;
+    text-align: center;
+;
+}
 
 /* ルーム情報表示用 */
 .controller-body .room-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
     text-align: center;
-    margin-top: 20px;
     font-size: 0.9rem;
     color: #aaa;
+}
+
+.controller-body .room-info p {
+    font-size: 0.8rem;
+    color: #888;
+    margin: 0px;
+}
+
+.controller-body .room-info small {
+    font-size: 0.8rem;
+    color: #888;
+    margin: 0px;
+}
+
+.controller-body .room-info .btn-leave {
+    padding: 10px 20px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #2a2a2a;
+    padding: 2rem;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #444;
+    color: white;
+}
+
+.modal-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
 }
 
 /* =========================================
@@ -148,12 +272,14 @@ body {
     height: 100vh;
     font-family: 'JetBrains Mono', 'Courier New', monospace;
     overflow: hidden;
-    cursor: none; /* マウス映り込み防止 */
+    cursor: none;
+    /* マウス映り込み防止 */
     padding: 10px;
 }
 
 .monitor-body #timecode-display {
-    font-size: 10vw; /* より大きく視認性アップ */
+    font-size: 10vw;
+    /* より大きく視認性アップ */
     /* 全角数字への変換（ブラウザのレイアウト機能を利用） */
     text-transform: full-width;
     /* タイムコードが左右にガタつかないよう、等幅フォントを指定 */
@@ -162,4 +288,3 @@ body {
     white-space: nowrap;
     overflow: hidden;
 }
-

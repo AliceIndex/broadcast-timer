@@ -12,113 +12,206 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/apigatewaymanagementapi"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
+// ActionMessage はフロントエンドから届くメッセージの構造体です
 type ActionMessage struct {
-	Action       string  `json:"action"`
-	State        string  `json:"state"`
-	ReferenceUTC int64   `json:"reference_utc"`
-	BaseFrames   int64   `json:"base_frames"`
-	FPS          float64 `json:"fps"`
-	IsDF         bool    `json:"is_df"`
+	Action        string  `json:"action"`
+	RoomID        string  `json:"room_id"`       // ルーム識別子
+	Pin           string  `json:"pin"`           // 4桁パスワード
+	State         string  `json:"state"`         // running, reset, etc.
+	ReferenceUTC  int64   `json:"reference_utc"` // 同期用の基準時刻
+	BaseFrames    int64   `json:"base_frames"`   // 通算フレーム
+	FPS           float64 `json:"fps"`           // フレームレート
+	IsDF          bool    `json:"is_df"`         // ドロップフレームフラグ
+	StartTimecode string  `json:"start_timecode"` // 開始オフセット時刻
+}
+
+// RoomState はDynamoDB(RoomStatesTable)に保存する部屋の状態です
+type RoomState struct {
+	RoomID        string  `json:"room_id" dynamodbav:"room_id"`
+	RoomPin       string  `json:"room_pin" dynamodbav:"room_pin"`
+	State         string  `json:"state" dynamodbav:"state"`
+	ReferenceUTC  int64   `json:"reference_utc" dynamodbav:"reference_utc"`
+	FPS           float64 `json:"fps" dynamodbav:"fps"`
+	IsDF          bool    `json:"is_df" dynamodbav:"is_df"`
+	StartTimecode string  `json:"start_timecode" dynamodbav:"start_timecode"`
 }
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
-	// ★ステップ1：Lambdaが起動したか？
-	fmt.Println("=== [DEBUG 1] Lambda起動！ ===")
-	fmt.Printf("EventType: %s | ConnectionID: %s\n", req.RequestContext.EventType, req.RequestContext.ConnectionID)
-
-	tableName := os.Getenv("CONNECTIONS_TABLE")
+	// 環境変数からテーブル名を取得[cite: 1, 2]
+	connTableName := os.Getenv("CONNECTIONS_TABLE")
+	roomTableName := os.Getenv("ROOM_STATES_TABLE")
+	
 	sess := session.Must(session.NewSession())
 	db := dynamodb.New(sess)
+	connectionID := req.RequestContext.ConnectionID
 
-	// 1. 接続時の処理
+	// 1. 接続・切断時の基本処理
 	if req.RequestContext.EventType == "CONNECT" {
-		fmt.Println("[CONNECT] データベースにIDを登録します...")
 		_, err := db.PutItem(&dynamodb.PutItemInput{
-			TableName: aws.String(tableName),
+			TableName: aws.String(connTableName),
 			Item: map[string]*dynamodb.AttributeValue{
-				"connectionId": {S: aws.String(req.RequestContext.ConnectionID)},
+				"connectionId": {S: aws.String(connectionID)},
 			},
 		})
-		if err != nil {
-			fmt.Println("[CONNECT ERROR] 登録失敗:", err)
-			return events.APIGatewayProxyResponse{StatusCode: 500}, err
-		}
-		fmt.Println("[CONNECT SUCCESS] 登録完了！")
-		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
+		return events.APIGatewayProxyResponse{StatusCode: 200}, err
 	}
 
-	// 2. 切断時の処理
 	if req.RequestContext.EventType == "DISCONNECT" {
-		fmt.Println("[DISCONNECT] データベースからIDを削除します...")
 		_, _ = db.DeleteItem(&dynamodb.DeleteItemInput{
-			TableName: aws.String(tableName),
+			TableName: aws.String(connTableName),
 			Key: map[string]*dynamodb.AttributeValue{
-				"connectionId": {S: aws.String(req.RequestContext.ConnectionID)},
+				"connectionId": {S: aws.String(connectionID)},
 			},
 		})
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
-	// ==========================================
-	// 3. メッセージ受信時 (STARTボタンを押した時の処理)
-	// ==========================================
-
-	// ★ステップ2：生データは届いているか？
-	fmt.Println("=== [DEBUG 2] メッセージ受信ルート到達 ===")
-	fmt.Println("ブラウザから届いた生のJSON:", req.Body)
-
+	// 2. メッセージ受信時の処理[cite: 1]
 	var msg ActionMessage
 	if err := json.Unmarshal([]byte(req.Body), &msg); err != nil {
-		// ★ステップ3-A：型のエラーなどで変換失敗した場合
-		fmt.Printf("=== [DEBUG 3-A ❌] JSONの変換に失敗しました！ 理由: %v\n", err)
 		return events.APIGatewayProxyResponse{StatusCode: 400}, nil
 	}
 
-	// ★ステップ3-B：変換成功！
-	fmt.Printf("=== [DEBUG 3-B ✅] JSON変換成功！ アクション: %s, 状態: %s\n", msg.Action, msg.State)
-
-	msg.Action = "sync"
-	responseData, _ := json.Marshal(msg)
-
+	// API Gateway Management API クライアントの初期化[cite: 1]
 	endpoint := fmt.Sprintf("https://%s/%s", req.RequestContext.DomainName, req.RequestContext.Stage)
 	apigw := apigatewaymanagementapi.New(sess, aws.NewConfig().WithEndpoint(endpoint))
 
-	fmt.Println("=== [DEBUG 4] データベースから全員のリストを取得します... ===")
-	scanOut, err := db.Scan(&dynamodb.ScanInput{
-		TableName: aws.String(tableName),
+	// アクションに応じた分岐処理
+	switch msg.Action {
+	case "join":
+		return handleJoin(db, apigw, connTableName, roomTableName, connectionID, msg)
+	case "leave":
+		return handleLeave(db, connTableName, connectionID)
+	default:
+		// running, reset, sync などの同期・操作処理
+		return handleSync(db, apigw, connTableName, roomTableName, msg)
+	}
+}
+
+// handleJoin は入室とパスワード照合を処理します[cite: 1]
+func handleJoin(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGatewayManagementApi, connTable, roomTable, connID string, msg ActionMessage) (events.APIGatewayProxyResponse, error) {
+	// 部屋情報を取得
+	result, err := db.GetItem(&dynamodb.GetItemInput{
+		TableName: aws.String(roomTable),
+		Key: map[string]*dynamodb.AttributeValue{
+			"room_id": {S: aws.String(msg.RoomID)},
+		},
 	})
 	if err != nil {
-		fmt.Printf("=== [DEBUG 4 ❌] DB読み込み失敗: %v ===\n", err)
 		return events.APIGatewayProxyResponse{StatusCode: 500}, err
 	}
 
-	successCount := 0
+	var room RoomState
+	if result.Item == nil {
+		// 部屋が存在しない場合は新規作成（送られた設定を初期値とする）
+		room = RoomState{
+			RoomID:        msg.RoomID,
+			RoomPin:       msg.Pin,
+			State:         "reset",
+			FPS:           msg.FPS,
+			IsDF:          msg.IsDF,
+			StartTimecode: msg.StartTimecode,
+		}
+		av, _ := dynamodbattribute.MarshalMap(room)
+		db.PutItem(&dynamodb.PutItemInput{
+			TableName: aws.String(roomTable),
+			Item:      av,
+		})
+	} else {
+		// 部屋が存在する場合はパスワード照合
+		dynamodbattribute.UnmarshalMap(result.Item, &room)
+		if msg.Pin != room.RoomPin {
+			// パスワード不一致エラー
+			return events.APIGatewayProxyResponse{StatusCode: 403}, nil
+		}
+	}
+
+	// 照合成功：ConnectionsTableを更新して room_id を紐付ける[cite: 2]
+	db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(connTable),
+		Item: map[string]*dynamodb.AttributeValue{
+			"connectionId": {S: aws.String(connID)},
+			"room_id":      {S: aws.String(msg.RoomID)},
+		},
+	})
+
+	// 入室した本人に現在の部屋の状態を同期データとして送る[cite: 1]
+	resData, _ := json.Marshal(room)
+	apigw.PostToConnection(&apigatewaymanagementapi.PostToConnectionInput{
+		ConnectionId: aws.String(connID),
+		Data:         resData,
+	})
+
+	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
+}
+
+// handleSync は操作コマンドを同じ部屋の全員に一斉送信します[cite: 1]
+func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGatewayManagementApi, connTable, roomTable string, msg ActionMessage) (events.APIGatewayProxyResponse, error) {
+	// 1. 部屋の最新状態を RoomStatesTable に保存[cite: 2]
+	// 操作（Start/Reset）が走るたびに、後から来た人のために状態を更新しておく
+	roomUpdate := RoomState{
+		RoomID:        msg.RoomID,
+		RoomPin:       msg.Pin,
+		State:         msg.State,
+		ReferenceUTC:  msg.ReferenceUTC,
+		FPS:           msg.FPS,
+		IsDF:          msg.IsDF,
+		StartTimecode: msg.StartTimecode,
+	}
+	av, _ := dynamodbattribute.MarshalMap(roomUpdate)
+	db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(roomTable),
+		Item:      av,
+	})
+
+	// 2. 同じルームに属する接続IDのみを取得 (FilterExpressionを使用)[cite: 1, 2]
+	scanOut, err := db.Scan(&dynamodb.ScanInput{
+		TableName:        aws.String(connTable),
+		FilterExpression: aws.String("room_id = :r"),
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":r": {S: aws.String(msg.RoomID)},
+		},
+	})
+	if err != nil {
+		return events.APIGatewayProxyResponse{StatusCode: 500}, err
+	}
+
+	// 3. 同じ部屋のメンバー全員に送信[cite: 1]
+	resData, _ := json.Marshal(msg)
 	for _, item := range scanOut.Items {
 		targetID := *item["connectionId"].S
-		fmt.Println("=== [DEBUG 5] 送信先:", targetID, "===")
-		
 		_, err := apigw.PostToConnection(&apigatewaymanagementapi.PostToConnectionInput{
 			ConnectionId: aws.String(targetID),
-			Data:         responseData,
+			Data:         resData,
 		})
 		
+		// 接続が切れている場合は名簿から削除[cite: 1]
 		if err != nil {
-			fmt.Println("=== [DEBUG 5 ❌] 送信失敗。名簿から削除します 理由:", err, "===")
 			db.DeleteItem(&dynamodb.DeleteItemInput{
-				TableName: aws.String(tableName),
+				TableName: aws.String(connTable),
 				Key: map[string]*dynamodb.AttributeValue{
 					"connectionId": {S: aws.String(targetID)},
 				},
 			})
-		} else {
-			successCount++
 		}
 	}
-	
-	fmt.Printf("=== [DEBUG 6 ✅] 全 %d 台への一斉送信完了！ ===\n", successCount)
+
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
+}
+
+// handleLeave は部屋からの退出処理を行います[cite: 1]
+func handleLeave(db *dynamodb.DynamoDB, connTable, connID string) (events.APIGatewayProxyResponse, error) {
+	// 接続IDは残したまま、room_id の紐付けだけを消去する
+	_, err := db.PutItem(&dynamodb.PutItemInput{
+		TableName: aws.String(connTable),
+		Item: map[string]*dynamodb.AttributeValue{
+			"connectionId": {S: aws.String(connID)},
+		},
+	})
+	return events.APIGatewayProxyResponse{StatusCode: 200}, err
 }
 
 func main() {
