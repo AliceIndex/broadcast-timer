@@ -90,29 +90,27 @@ function handleServerMessage(data) {
     }
 }
 
-// ★追加: 時計の針を動かし続けるモーター関数
+// ★ 時計の針を動かし続けるモーター関数
 function startClockMotor() {
     // すでにモーターが動いていたら二重起動を防ぐ
     if (clockInterval) clearInterval(clockInterval);
 
-    // 約33ミリ秒（約30fps）ごとに画面を更新し続ける
+    // 約33ミリ秒ごとに画面を更新し続ける
     clockInterval = setInterval(() => {
         // 1. スタートした基準時間から、今何ミリ秒経ったかを計算
         const elapsedMs = Date.now() - currentState.reference_utc;
 
-        // 2. 経過時間をタイムコード（hh:mm:ss:ff）に変換する
-        // ※ここはありすが既に作っている「タイムコード計算関数」を呼び出してください！
-        // const currentTimecode = calculateTimecode(elapsedMs, 30.0, false);
-        
-        // 仮の表示（ミリ秒を秒に変換して表示）
-        const tempDisplay = (elapsedMs / 1000).toFixed(2);
+        // 2. ミリ秒をプロ仕様のタイムコードに変換（FPSとDF設定は送信データに合わせる）
+        // ※今回は送信データの fps: 30.0, is_df: false に合わせています
+        const currentTimecode = calculateTimecode(elapsedMs, 30.0, false);
 
         // 3. 画面の文字を書き換える
         if (timecodeDisplay) {
-            timecodeDisplay.textContent = tempDisplay; // 本番は currentTimecode に変えてください
+            timecodeDisplay.textContent = currentTimecode;
         }
     }, 33);
 }
+
 
 // ★追加: 時計を止める関数
 function stopClockMotor() {
@@ -182,6 +180,45 @@ function bindEvents() { //[cite: 1]
             }
         }
     });
+}
+// --------------------------------------------------
+// タイムコード計算エンジン (timecode.goからの移植)
+// --------------------------------------------------
+function calculateTimecode(elapsedMs, fps, isDropFrame) {
+    // 1. 経過時間(ミリ秒)から、通算フレーム数を計算
+    let frames = Math.floor(elapsedMs * fps / 1000);
+
+    const fpsRound = Math.round(fps);
+
+    // 2. ドロップフレーム(DF)補正
+    if (isDropFrame && (fpsRound === 30 || fpsRound === 60)) {
+        let dropPerMinute = 2;
+        if (fpsRound === 60) {
+            dropPerMinute = 4;
+        }
+        const totalMinutes = Math.floor(frames / (fpsRound * 60));
+        // 10分ごとの例外処理を含むドロップフレーム補正
+        const dropFrames = dropPerMinute * (totalMinutes - Math.floor(totalMinutes / 10));
+        frames += dropFrames;
+    }
+
+    // 3. 24時間ロールオーバー処理
+    frames = frames % (fpsRound * 3600 * 24);
+
+    // 4. 時・分・秒・フレームの割り出し
+    const f = frames % fpsRound;
+    const s = Math.floor(frames / fpsRound) % 60;
+    const m = Math.floor(frames / (fpsRound * 60)) % 60;
+    const h = Math.floor(frames / (fpsRound * 3600)) % 24;
+
+    // 5. フォーマット（区切り文字）
+    const sep = isDropFrame ? ";" : ":";
+
+    // 2桁のゼロ埋め用ヘルパー関数
+    const pad = (num) => String(num).padStart(2, '0');
+
+    // HH:mm:ss:ff の形式で返す
+    return `${pad(h)}:${pad(m)}:${pad(s)}${sep}${pad(f)}`;
 }
 
 // --------------------------------------------------
