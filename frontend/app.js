@@ -252,6 +252,36 @@ function framesToTimecode(frames, fps, isDropFrame) {
     return `${pad(h)}:${pad(m)}:${pad(s)}${sep}${pad(f)}`;
 }
 
+// URLから room と pin を取得
+const urlParams = new URLSearchParams(window.location.search);
+const roomID = urlParams.get('room');
+const roomPIN = urlParams.get('pin');
+const mode = urlParams.get('mode'); // 'new' か 'join'
+
+// もし情報がなければトップに戻す
+if (!roomID || !roomPIN) {
+    window.location.href = 'index.html';
+}
+
+// 画面に表示
+document.getElementById('display-room-id').textContent = roomID;
+document.getElementById('display-room-pin').textContent = roomPIN;
+
+// WebSocket接続が確立した時の処理を修正
+ws.onopen = () => {
+    isConnected = true;
+    console.log('Connected to Server');
+
+    // ★入室（または作成）をサーバーに知らせる
+    const joinPayload = {
+        action: "join",
+        room_id: roomID,
+        pin: roomPIN,
+        mode: mode // 新規なら初期化、既存ならロードをサーバーに促す
+    };
+    ws.send(JSON.stringify(joinPayload));
+};
+
 // --------------------------------------------------
 // アプリケーション起動[cite: 1]
 // --------------------------------------------------
