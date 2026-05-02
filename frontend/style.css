@@ -102,11 +102,12 @@ body {
 
 .controller-body .timecode {
     font-size: 3.5rem;
-    font-family: 'JetBrains Mono', monospace;
-    font-variant-numeric: tabular-nums;
     text-align: center;
     margin-bottom: 25px;
-    color: #ffffff; /* プロ機材っぽく緑に */
+    color: #ffffff;
+   /* モニターと同様に全角化と等幅フォントを適用 */
+    text-transform: full-width;
+    font-family: "Courier New", Courier, monospace;
     text-shadow: 0 0 10px rgba(0,255,0,0.3);
 }
 
@@ -152,7 +153,13 @@ body {
 }
 
 .monitor-body #timecode-display {
-    font-size: 18vw; /* より大きく視認性アップ */
-    font-variant-numeric: tabular-nums;
-    font-weight: bold;
+    font-size: 10vw; /* より大きく視認性アップ */
+    /* 全角数字への変換（ブラウザのレイアウト機能を利用） */
+    text-transform: full-width;
+    /* タイムコードが左右にガタつかないよう、等幅フォントを指定 */
+    font-family: "Courier New", Courier, monospace;
+    /* 折り返しを禁止して1行を死守 */
+    white-space: nowrap;
+    overflow: hidden;
 }
+
