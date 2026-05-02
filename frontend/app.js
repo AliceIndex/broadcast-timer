@@ -15,6 +15,9 @@ const stopBtn = document.getElementById('btn-stop'); //[cite: 1]
 const resetBtn = document.getElementById('btn-reset'); //[cite: 1]
 const statusIndicator = document.getElementById('status-indicator'); //[cite: 1]
 
+const room_id = document.getElementById('myElement');
+const room_pin = document.getElementById('display-room-pin');
+
 // URLから room と pin を取得
 const urlParams = new URLSearchParams(window.location.search);
 const roomID = urlParams.get('room');
@@ -27,8 +30,10 @@ if (!roomID || !roomPIN) {
 }
 
 // 画面に表示
-document.getElementById('display-room-id').textContent = roomID;
-document.getElementById('display-room-pin').textContent = roomPIN;
+if (room_id && room_pin) {
+    room_id.textContent = roomID;
+    room_pin.textContent = roomPIN;
+}
 
 // 内部状態の保持[cite: 1]
 let currentState = { //[cite: 1]
