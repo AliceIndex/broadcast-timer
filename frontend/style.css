@@ -73,10 +73,11 @@ body {
     /*[cite: 3] */
     cursor: none;
     /* 現場でのマウス映り込み防止[cite: 3] */
+    padding: 10px;
 }
 
 .monitor-body #timecode-display {
-    font-size: 18vw;
+    font-size: 10vw;
     /*[cite: 3] */
     font-variant-numeric: tabular-nums;
     /*[cite: 3] */
