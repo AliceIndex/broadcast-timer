@@ -66,21 +66,18 @@ function handleServerMessage(data) {
         currentState.state = data.state || currentState.state;
         currentState.reference_utc = data.reference_utc || currentState.reference_utc;
         
-        // サーバーから同期された設定を保存
+        // ★サーバーから配られた「設定」と「下駄（base_frames）」を保存
         currentState.fps = data.fps || 30.0;
         currentState.is_df = data.is_df || false;
-        currentState.start_timecode = data.start_timecode || "00:00:00:00";
-
-        // 開始タイムコードをフレーム数に変換して下駄（オフセット）として保持
-        currentState.startOffsetFrames = tcToFrames(currentState.start_timecode, currentState.fps);
+        currentState.base_frames = data.base_frames || 0; 
 
         if (currentState.state === 'running') {
             startClockMotor();
         } else if (currentState.state === 'reset') {
             stopClockMotor();
             if (timecodeDisplay) {
-                // リセット時は、設定された「開始時間」に戻す
-                timecodeDisplay.textContent = currentState.start_timecode; 
+                // ★リセット時は、下駄のフレーム数(base_frames)を文字に戻して表示する
+                timecodeDisplay.textContent = framesToTimecode(currentState.base_frames, currentState.fps, currentState.is_df);
             }
         } else {
             stopClockMotor();
@@ -101,8 +98,8 @@ function startClockMotor() {
         // 2. そのミリ秒をフレーム数に変換
         const elapsedFrames = Math.floor(elapsedMs * currentState.fps / 1000);
         
-        // 3. 「開始時間のフレーム数」＋「経過フレーム数」
-        const totalFrames = currentState.startOffsetFrames + elapsedFrames;
+        // 3. ★「配られた下駄(base_frames)」＋「経過フレーム数」
+        const totalFrames = currentState.base_frames + elapsedFrames;
 
         // 4. 合計フレーム数を文字列にして画面に表示
         const currentTimecode = framesToTimecode(totalFrames, currentState.fps, currentState.is_df);
@@ -123,29 +120,28 @@ function stopClockMotor() {
 
 
 function sendCommand(actionName, state) {
-    console.log("ボタンが押されました！ 送信しようとしているアクション:", actionName);
-
-    if (!isConnected || ws.readyState !== WebSocket.OPEN) {
-        console.warn('送信を中止しました: WebSocketがまだ繋がっていません。');
-        return;
-    }
+    if (!isConnected || ws.readyState !== WebSocket.OPEN) return;
 
     // UIから設定値を取得
     const selectedFps = parseFloat(document.getElementById('fpsSelect').value);
     const startTimeStr = document.getElementById('startTimeInput').value;
 
+    // ★ブラウザ側で、開始時間(01:00:00:00)を、下駄となるフレーム数(base_frames)に変換する
+    const baseFrames = tcToFrames(startTimeStr, selectedFps);
+
     const payload = {
         "action": actionName,
         "state": state,
         "reference_utc": Date.now(),
+        "base_frames": baseFrames, // ★文字列ではなく、計算済みのフレーム数を送る！
         "fps": selectedFps,
-        "start_timecode": startTimeStr,
-        "is_df": selectedFps === 29.97 || selectedFps === 59.94 // 29.97や59.94なら自動でDF(ドロップフレーム)にする
+        "is_df": selectedFps === 29.97 || selectedFps === 59.94
     };
 
     console.log("送信データ:", payload);
     ws.send(JSON.stringify(payload));
 }
+
 // --------------------------------------------------
 // 4. UI更新とイベントバインディング[cite: 1]
 // --------------------------------------------------
