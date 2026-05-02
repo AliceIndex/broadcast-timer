@@ -52,7 +52,7 @@ func NewBroadcastTimerStack(scope constructs.Construct, id string, props *TimerS
 		AutoDeploy:   jsii.Bool(true),
 	})
 
-	// 1. 既存の ConnectionsTable (名簿用)
+	// 1. 既存の ConnectionsTable (接続管理用)[cite: 2]
 	connectionsTable := awsdynamodb.NewTable(stack, jsii.String("ConnectionsTable"), &awsdynamodb.TableProps{
 		PartitionKey: &awsdynamodb.Attribute{
 			Name: jsii.String("connectionId"),
@@ -61,10 +61,10 @@ func NewBroadcastTimerStack(scope constructs.Construct, id string, props *TimerS
 		BillingMode:   awsdynamodb.BillingMode_PAY_PER_REQUEST,
 		RemovalPolicy: awscdk.RemovalPolicy_DESTROY,
 	})
-	connectionsTable.GrantFullAccess(handler)[cite: 2]
-	handler.AddEnvironment(jsii.String("CONNECTIONS_TABLE"), connectionsTable.TableName(), nil)[cite: 2]
+	connectionsTable.GrantFullAccess(handler)
+	handler.AddEnvironment(jsii.String("CONNECTIONS_TABLE"), connectionsTable.TableName(), nil)
 
-	// 2. 新設 RoomStatesTable (部屋の状態用)[cite: 1, 2]
+	// 2. 新設 RoomStatesTable (ルームの状態・パスワード管理用)
 	roomStatesTable := awsdynamodb.NewTable(stack, jsii.String("RoomStatesTable"), &awsdynamodb.TableProps{
 		PartitionKey: &awsdynamodb.Attribute{
 			Name: jsii.String("room_id"),
@@ -73,8 +73,8 @@ func NewBroadcastTimerStack(scope constructs.Construct, id string, props *TimerS
 		BillingMode:   awsdynamodb.BillingMode_PAY_PER_REQUEST,
 		RemovalPolicy: awscdk.RemovalPolicy_DESTROY,
 	})
-	roomStatesTable.GrantFullAccess(handler)[cite: 2]
-	handler.AddEnvironment(jsii.String("ROOM_STATES_TABLE"), roomStatesTable.TableName(), nil)[cite: 2]
+	roomStatesTable.GrantFullAccess(handler)
+	handler.AddEnvironment(jsii.String("ROOM_STATES_TABLE"), roomStatesTable.TableName(), nil)
 
 	// URLを出力[cite: 2]
 	apiEndpoint := fmt.Sprintf("wss://%s.execute-api.%s.amazonaws.com/%s", *webSocketApi.ApiId(), *stack.Region(), props.EnvName)
@@ -82,7 +82,6 @@ func NewBroadcastTimerStack(scope constructs.Construct, id string, props *TimerS
 		Value: jsii.String(apiEndpoint),
 	})
 
-	// ★必ず最後！関数の戻り値[cite: 2]
 	return stack
 }
 
