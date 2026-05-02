@@ -1,6 +1,7 @@
 // デプロイ時に取得した本番環境のURL
 const API_URL = "wss://2cz26o6t9k.execute-api.ap-northeast-1.amazonaws.com/prod"; //[cite: 1]
 
+
 let ws; //[cite: 1]
 let isConnected = false; //[cite: 1]
 
