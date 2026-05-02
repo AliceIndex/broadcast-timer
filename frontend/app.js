@@ -276,6 +276,20 @@ function framesToTimecode(frames, fps, isDropFrame) {
     return `${pad(h)}:${pad(m)}:${pad(s)}${sep}${pad(f)}`;
 }
 
+function openMonitorWindow() {
+    // 現在のページから roomID と roomPIN を取得（URLから取得済みの変数を使用）
+    if (!roomID || !roomPIN) {
+        alert("ルーム情報が見つかりません。");
+        return;
+    }
+
+    // パラメータを付与したURLを作成
+    const monitorUrl = `monitor.html?room=${roomID}&pin=${roomPIN}`;
+
+    // 別ウィンドウで開く
+    window.open(monitorUrl, '_blank', 'width=800,height=600');
+}
+
 // --------------------------------------------------
 // アプリケーション起動[cite: 1]
 // --------------------------------------------------
