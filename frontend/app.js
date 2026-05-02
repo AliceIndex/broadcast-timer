@@ -55,20 +55,66 @@ function initWebSocket() { //[cite: 1]
     };
 }
 
-// --------------------------------------------------
-// 3. メッセージ送受信のハンドリング[cite: 1]
-// --------------------------------------------------
-function handleServerMessage(data) { //[cite: 1]
-    if (data.action === 'sync' || data.timecode) { //[cite: 1]
-        currentState.status = data.status || currentState.status; //[cite: 1]
-        currentState.timecode = data.timecode || currentState.timecode; //[cite: 1]
+// ★追加: モーター（タイマー）を管理するための変数
+let clockInterval = null;
 
-        // 画面のタイムコード表示を即座に更新[cite: 1]
-        if (timecodeDisplay) { //[cite: 1]
-            timecodeDisplay.textContent = currentState.timecode; //[cite: 1]
+// --------------------------------------------------
+// 3. メッセージ送受信のハンドリング
+// --------------------------------------------------
+function handleServerMessage(data) {
+    if (data.action === 'sync' || data.timecode) {
+        // 修正1: data.status ではなく data.state に直す！
+        currentState.state = data.state || currentState.state;
+        
+        // サーバーから送られてきた基準時間（スタートした瞬間の時間）を保存
+        currentState.reference_utc = data.reference_utc || currentState.reference_utc;
+
+        if (currentState.state === 'START' || currentState.state === 'PLAY') {
+            // ★修正2-A: スタートの合図が来たら、時計のモーターを回す！
+            startClockMotor();
+        } else {
+            // ストップの合図ならモーターを止める
+            stopClockMotor();
+            // 止まった瞬間のタイムコードを1回だけ画面に更新しておく
+            if (timecodeDisplay && data.timecode) {
+                timecodeDisplay.textContent = data.timecode;
+            }
         }
     }
 }
+
+// ★追加: 時計の針を動かし続けるモーター関数
+function startClockMotor() {
+    // すでにモーターが動いていたら二重起動を防ぐ
+    if (clockInterval) clearInterval(clockInterval);
+
+    // 約33ミリ秒（約30fps）ごとに画面を更新し続ける
+    clockInterval = setInterval(() => {
+        // 1. スタートした基準時間から、今何ミリ秒経ったかを計算
+        const elapsedMs = Date.now() - currentState.reference_utc;
+
+        // 2. 経過時間をタイムコード（hh:mm:ss:ff）に変換する
+        // ※ここはありすが既に作っている「タイムコード計算関数」を呼び出してください！
+        // const currentTimecode = calculateTimecode(elapsedMs, 30.0, false);
+        
+        // 仮の表示（ミリ秒を秒に変換して表示）
+        const tempDisplay = (elapsedMs / 1000).toFixed(2);
+
+        // 3. 画面の文字を書き換える
+        if (timecodeDisplay) {
+            timecodeDisplay.textContent = tempDisplay; // 本番は currentTimecode に変えてください
+        }
+    }, 33);
+}
+
+// ★追加: 時計を止める関数
+function stopClockMotor() {
+    if (clockInterval) {
+        clearInterval(clockInterval);
+        clockInterval = null;
+    }
+}
+
 
 function sendCommand(actionName, state) { //[cite: 1]
     // ★ 1. まずボタンが反応しているかブラウザのコンソールに出す
