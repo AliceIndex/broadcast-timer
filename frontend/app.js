@@ -69,9 +69,15 @@ function handleServerMessage(data) {
         // サーバーから送られてきた基準時間（スタートした瞬間の時間）を保存
         currentState.reference_utc = data.reference_utc || currentState.reference_utc;
 
-        if (currentState.state === 'START' || currentState.state === 'PLAY') {
+        if (currentState.state === 'running') {
             // ★修正2-A: スタートの合図が来たら、時計のモーターを回す！
             startClockMotor();
+        } else if (currentState.state === 'reset') {
+            // ② ★追加：リセット処理
+            stopClockMotor();
+            if (timecodeDisplay) {
+                // 初期値のタイムコードに強制上書き（環境に合わせて変えてください）
+                timecodeDisplay.textContent = "00:00:00:00"; 
         } else {
             // ストップの合図ならモーターを止める
             stopClockMotor();
