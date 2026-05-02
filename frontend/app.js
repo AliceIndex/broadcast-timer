@@ -78,6 +78,7 @@ function handleServerMessage(data) {
             if (timecodeDisplay) {
                 // 初期値のタイムコードに強制上書き（環境に合わせて変えてください）
                 timecodeDisplay.textContent = "00:00:00:00"; 
+            }
         } else {
             // ストップの合図ならモーターを止める
             stopClockMotor();
