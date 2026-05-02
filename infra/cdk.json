@@ -1,6 +1,6 @@
 {
   "app": "go run broadcast_timer_infra.go",
   "context": {
-    "env": "dev"
+    "env": "prod"
   }
 }
