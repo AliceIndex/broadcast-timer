@@ -221,6 +221,40 @@ function calculateTimecode(elapsedMs, fps, isDropFrame) {
     return `${pad(h)}:${pad(m)}:${pad(s)}${sep}${pad(f)}`;
 }
 
+// タイムコード文字列(HH:mm:ss:ff)を、指定FPSでの通算フレーム数に変換する
+function tcToFrames(tc, fps) {
+    const parts = tc.replace(';', ':').split(':').map(Number);
+    if (parts.length !== 4) return 0;
+    const [h, m, s, f] = parts;
+    const fpsRound = Math.round(fps);
+    return (((h * 3600) + (m * 60) + s) * fpsRound) + f;
+}
+
+// 通算フレーム数を、プロ仕様のタイムコード文字列に変換する (timecode.goのJS版)
+function framesToTimecode(frames, fps, isDropFrame) {
+    const fpsRound = Math.round(fps);
+
+    if (isDropFrame && (fpsRound === 30 || fpsRound === 60)) {
+        let dropPerMinute = 2;
+        if (fpsRound === 60) dropPerMinute = 4;
+        const totalMinutes = Math.floor(frames / (fpsRound * 60));
+        const dropFrames = dropPerMinute * (totalMinutes - Math.floor(totalMinutes / 10));
+        frames += dropFrames;
+    }
+
+    frames = frames % (fpsRound * 3600 * 24);
+
+    const f = frames % fpsRound;
+    const s = Math.floor(frames / fpsRound) % 60;
+    const m = Math.floor(frames / (fpsRound * 60)) % 60;
+    const h = Math.floor(frames / (fpsRound * 3600)) % 24;
+
+    const sep = isDropFrame ? ";" : ":";
+    const pad = (num) => String(num).padStart(2, '0');
+
+    return `${pad(h)}:${pad(m)}:${pad(s)}${sep}${pad(f)}`;
+}
+
 // --------------------------------------------------
 // アプリケーション起動[cite: 1]
 // --------------------------------------------------
