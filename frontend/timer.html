@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja"> <!--[cite: 2] -->
+<head>
+    <meta charset="UTF-8"> <!--[cite: 2] -->
+    <title>Controller - Broadcast Timer</title> <!--[cite: 2] -->
+    <!-- 共通スタイルシートを読み込み -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="controller-body">
+    <div class="room-info">
+        <p>Room: <span id="display-room-id">----</span></p>
+        <p>PIN: <span id="display-room-pin">----</span></p>
+        <small>この情報を仲間に共有してください</small>
+    </div>
+    <div class="panel"> <!--[cite: 2] -->
+        <!-- IDを app.js に合わせて修正 -->
+        <div class="timecode" id="timecode-display">00:00:00:00</div>
+        
+        <div style="text-align: center;"> <!--[cite: 2] -->
+            <!-- イベント処理は app.js 側で行うため、idのみ付与 -->
+            <button id="btn-start">START</button>
+            <button id="btn-stop">STOP</button>
+            <button id="btn-reset">RESET</button>
+        </div>
+        <!-- タイムコード設定エリア -->
+        <div id="settings-panel" style="margin-bottom: 20px; text-align: center;">
+            <div>
+                <label style="margin-right: 15px;">
+                    開始タイムコード: 
+                    <input type="text" id="startTimeInput" value="00:00:00:00" style="font-size: 1.2rem; padding: 5px; width: 140px;">
+                </label>
+            </div>
+            <div>
+                <label>
+                    フレームレート:
+                    <select id="fpsSelect" style="font-size: 1.2rem; padding: 5px;">
+                        <option value="23.976">23.976</option>
+                        <option value="24">24</option>
+                        <option value="29.97">29.97</option>
+                        <option value="30" selected>30</option>
+                        <option value="59.94">59.94</option>
+                        <option value="60">60</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+        <hr>
+        <button onclick="window.open('monitor.html', '_blank', 'width=800,height=600')">表示モニターを開く</button> <!--[cite: 2] -->
+        
+        <!-- 接続ステータス表示（任意） -->
+        <div id="status-indicator" style="text-align: center; margin-top: 15px; font-weight: bold;"></div>
+    </div>
+
+    <!-- 統合したJSファイルを読み込み -->
+    <script src="app.js"></script> <!--[cite: 2] -->
+</body>
+</html>
