@@ -63,26 +63,27 @@ let clockInterval = null;
 // --------------------------------------------------
 function handleServerMessage(data) {
     if (data.action === 'sync' || data.timecode) {
-        // 修正1: data.status ではなく data.state に直す！
         currentState.state = data.state || currentState.state;
-        
-        // サーバーから送られてきた基準時間（スタートした瞬間の時間）を保存
         currentState.reference_utc = data.reference_utc || currentState.reference_utc;
+        
+        // サーバーから同期された設定を保存
+        currentState.fps = data.fps || 30.0;
+        currentState.is_df = data.is_df || false;
+        currentState.start_timecode = data.start_timecode || "00:00:00:00";
+
+        // 開始タイムコードをフレーム数に変換して下駄（オフセット）として保持
+        currentState.startOffsetFrames = tcToFrames(currentState.start_timecode, currentState.fps);
 
         if (currentState.state === 'running') {
-            // ★修正2-A: スタートの合図が来たら、時計のモーターを回す！
             startClockMotor();
         } else if (currentState.state === 'reset') {
-            // ② ★追加：リセット処理
             stopClockMotor();
             if (timecodeDisplay) {
-                // 初期値のタイムコードに強制上書き（環境に合わせて変えてください）
-                timecodeDisplay.textContent = "00:00:00:00"; 
+                // リセット時は、設定された「開始時間」に戻す
+                timecodeDisplay.textContent = currentState.start_timecode; 
             }
         } else {
-            // ストップの合図ならモーターを止める
             stopClockMotor();
-            // 止まった瞬間のタイムコードを1回だけ画面に更新しておく
             if (timecodeDisplay && data.timecode) {
                 timecodeDisplay.textContent = data.timecode;
             }
@@ -90,27 +91,27 @@ function handleServerMessage(data) {
     }
 }
 
-// ★ 時計の針を動かし続けるモーター関数
 function startClockMotor() {
-    // すでにモーターが動いていたら二重起動を防ぐ
     if (clockInterval) clearInterval(clockInterval);
 
-    // 約33ミリ秒ごとに画面を更新し続ける
     clockInterval = setInterval(() => {
-        // 1. スタートした基準時間から、今何ミリ秒経ったかを計算
+        // 1. スタートしてから何ミリ秒経ったか
         const elapsedMs = Date.now() - currentState.reference_utc;
+        
+        // 2. そのミリ秒をフレーム数に変換
+        const elapsedFrames = Math.floor(elapsedMs * currentState.fps / 1000);
+        
+        // 3. 「開始時間のフレーム数」＋「経過フレーム数」
+        const totalFrames = currentState.startOffsetFrames + elapsedFrames;
 
-        // 2. ミリ秒をプロ仕様のタイムコードに変換（FPSとDF設定は送信データに合わせる）
-        // ※今回は送信データの fps: 30.0, is_df: false に合わせています
-        const currentTimecode = calculateTimecode(elapsedMs, 30.0, false);
+        // 4. 合計フレーム数を文字列にして画面に表示
+        const currentTimecode = framesToTimecode(totalFrames, currentState.fps, currentState.is_df);
 
-        // 3. 画面の文字を書き換える
         if (timecodeDisplay) {
             timecodeDisplay.textContent = currentTimecode;
         }
     }, 33);
 }
-
 
 // ★追加: 時計を止める関数
 function stopClockMotor() {
@@ -121,30 +122,30 @@ function stopClockMotor() {
 }
 
 
-function sendCommand(actionName, state) { //[cite: 1]
-    // ★ 1. まずボタンが反応しているかブラウザのコンソールに出す
+function sendCommand(actionName, state) {
     console.log("ボタンが押されました！ 送信しようとしているアクション:", actionName);
 
     if (!isConnected || ws.readyState !== WebSocket.OPEN) {
-        // ★ 2. もし接続が原因で送れないなら、その理由を叫ぶ
-        console.warn('送信を中止しました: WebSocketがまだ繋がっていません。状態:', ws ? ws.readyState : '未定義');
+        console.warn('送信を中止しました: WebSocketがまだ繋がっていません。');
         return;
     }
 
-    // Lambdaのテストケースで成功した「body」の中身と完全に一致させる
+    // UIから設定値を取得
+    const selectedFps = parseFloat(document.getElementById('fpsSelect').value);
+    const startTimeStr = document.getElementById('startTimeInput').value;
+
     const payload = {
-        "action": actionName, // ★ここがAPI Gatewayのルート判定に使われます
+        "action": actionName,
         "state": state,
         "reference_utc": Date.now(),
-        "base_frames": 0,
-        "fps": 30.0,
-        "is_df": false
+        "fps": selectedFps,
+        "start_timecode": startTimeStr,
+        "is_df": selectedFps === 29.97 || selectedFps === 59.94 // 29.97や59.94なら自動でDF(ドロップフレーム)にする
     };
 
     console.log("送信データ:", payload);
     ws.send(JSON.stringify(payload));
 }
-
 // --------------------------------------------------
 // 4. UI更新とイベントバインディング[cite: 1]
 // --------------------------------------------------
