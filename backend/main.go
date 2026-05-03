@@ -60,7 +60,6 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 	if req.RequestContext.EventType == "DISCONNECT" {
 		fmt.Println("[DISCONNECT] Removing connection ID...")
 		
-		// 1. 削除前に、どの部屋にいたかを取得
 		result, err := db.GetItem(&dynamodb.GetItemInput{
 			TableName: aws.String(connTableName),
 			Key: map[string]*dynamodb.AttributeValue{
@@ -74,7 +73,6 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 			}
 		}
 
-		// 2. 名簿から削除
 		_, _ = db.DeleteItem(&dynamodb.DeleteItemInput{
 			TableName: aws.String(connTableName),
 			Key: map[string]*dynamodb.AttributeValue{
@@ -82,8 +80,10 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 			},
 		})
 
-		// 3. 部屋が空になったか確認して削除
 		cleanupRoomIfEmpty(db, connTableName, roomTableName, roomID)
+		
+		// ★ 切断後にも部屋の状況を出力
+		printRoomMemberCounts(db, connTableName)
 
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
@@ -178,6 +178,9 @@ func handleJoin(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 		Data:         resData,
 	})
 
+	// ★ 入室後に部屋の状況を出力
+	printRoomMemberCounts(db, connTable)
+
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }
 
@@ -204,7 +207,6 @@ func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 		},
 	})
 
-	// フロントエンドでの処理を簡略化するためアクション名を上書き
 	msg.Action = "sync"
 	resData, _ := json.Marshal(msg)
 
@@ -233,7 +235,6 @@ func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 func handleLeave(db *dynamodb.DynamoDB, connTable, roomTable, connID string, msg ActionMessage) (events.APIGatewayProxyResponse, error) {
 	fmt.Printf("[LEAVE] Removing room binding for connection: %s from room: %s\n", connID, msg.RoomID)
 	
-	// connectionIdは残し、room_idだけ消去
 	_, err := db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(connTable),
 		Item: map[string]*dynamodb.AttributeValue{
@@ -242,6 +243,9 @@ func handleLeave(db *dynamodb.DynamoDB, connTable, roomTable, connID string, msg
 	})
 
 	cleanupRoomIfEmpty(db, connTable, roomTable, msg.RoomID)
+	
+	// ★ 退室後に部屋の状況を出力
+	printRoomMemberCounts(db, connTable)
 
 	return events.APIGatewayProxyResponse{StatusCode: 200}, err
 }
@@ -279,6 +283,37 @@ func cleanupRoomIfEmpty(db *dynamodb.DynamoDB, connTable, roomTable, roomID stri
 	} else {
 		fmt.Printf("[CLEANUP] Room %s still has %d members.\n", roomID, len(scanOut.Items))
 	}
+}
+
+// ★ 追加：すべての部屋の人数を集計してログに出力する関数
+func printRoomMemberCounts(db *dynamodb.DynamoDB, connTable string) {
+	fmt.Println("=== [DEBUG] Current Room Status ===")
+	
+	scanOut, err := db.Scan(&dynamodb.ScanInput{
+		TableName: aws.String(connTable),
+	})
+	if err != nil {
+		fmt.Printf("[DEBUG ERROR] Failed to scan connections: %v\n", err)
+		return
+	}
+
+	counts := make(map[string]int)
+	for _, item := range scanOut.Items {
+		if rID, ok := item["room_id"]; ok && rID.S != nil {
+			counts[*rID.S]++
+		} else {
+			counts["(No Room)"]++ // 接続済みだが、どの部屋にも入っていないユーザー
+		}
+	}
+
+	if len(counts) == 0 {
+		fmt.Println("No active connections.")
+	} else {
+		for room, count := range counts {
+			fmt.Printf("  - Room [%s]: %d user(s)\n", room, count)
+		}
+	}
+	fmt.Println("===================================")
 }
 
 func main() {
