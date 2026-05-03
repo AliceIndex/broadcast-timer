@@ -24,17 +24,16 @@ type ActionMessage struct {
 	BaseFrames    int64   `json:"base_frames"`
 	FPS           float64 `json:"fps"`
 	IsDF          bool    `json:"is_df"`
-	StartTimecode string  `json:"start_timecode"`
 }
 
 type RoomState struct {
-	RoomID        string  `json:"room_id" dynamodbav:"room_id"`
-	RoomPin       string  `json:"room_pin" dynamodbav:"room_pin"`
-	State         string  `json:"state" dynamodbav:"state"`
-	ReferenceUTC  int64   `json:"reference_utc" dynamodbav:"reference_utc"`
-	FPS           float64 `json:"fps" dynamodbav:"fps"`
-	IsDF          bool    `json:"is_df" dynamodbav:"is_df"`
-	StartTimecode string  `json:"start_timecode" dynamodbav:"start_timecode"`
+	RoomID       string  `json:"room_id" dynamodbav:"room_id"`
+	RoomPin      string  `json:"room_pin" dynamodbav:"room_pin"`
+	State        string  `json:"state" dynamodbav:"state"`
+	ReferenceUTC int64   `json:"reference_utc" dynamodbav:"reference_utc"`
+	BaseFrames   int64   `json:"base_frames" dynamodbav:"base_frames"` // 数値で管理
+	FPS          float64 `json:"fps" dynamodbav:"fps"`
+	IsDF         bool    `json:"is_df" dynamodbav:"is_df"`
 }
 
 func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -118,7 +117,7 @@ func handleJoin(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 			State:         "reset",
 			FPS:           msg.FPS,
 			IsDF:          msg.IsDF,
-			StartTimecode: msg.StartTimecode,
+			BaseFrames:    msg.BaseFrames,
 		}
 		av, _ := dynamodbattribute.MarshalMap(room)
 		db.PutItem(&dynamodb.PutItemInput{
@@ -157,13 +156,13 @@ func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 	fmt.Printf("[SYNC] Updating room %s state to: %s (Ref: %d)\n", msg.RoomID, msg.State, msg.ReferenceUTC)
 	
 	roomUpdate := RoomState{
-		RoomID:        msg.RoomID,
-		RoomPin:       msg.Pin,
-		State:         msg.State,
-		ReferenceUTC:  msg.ReferenceUTC,
-		FPS:           msg.FPS,
-		IsDF:          msg.IsDF,
-		StartTimecode: msg.StartTimecode,
+		RoomID:       msg.RoomID,
+		RoomPin:      msg.Pin,
+		State:        msg.State,
+		ReferenceUTC: msg.ReferenceUTC,
+		BaseFrames:   msg.BaseFrames, // ここで数値を保存
+		FPS:          msg.FPS,
+		IsDF:         msg.IsDF,
 	}
 	av, _ := dynamodbattribute.MarshalMap(roomUpdate)
 	db.PutItem(&dynamodb.PutItemInput{

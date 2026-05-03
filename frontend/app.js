@@ -16,7 +16,7 @@ const stopBtn = document.getElementById('btn-stop'); //[cite: 1]
 const resetBtn = document.getElementById('btn-reset'); //[cite: 1]
 const statusIndicator = document.getElementById('status-indicator'); //[cite: 1]
 
-const room_id = document.getElementById('myElement');
+const room_id = document.getElementById('display-room-id');
 const room_pin = document.getElementById('display-room-pin');
 
 // URLから room と pin を取得
@@ -163,6 +163,8 @@ function sendCommand(actionName, state) {
 
     const payload = {
         "action": actionName,
+        "room_id": roomID,
+        "pin": roomPIN,
         "state": state,
         "reference_utc": Date.now(),
         "base_frames": baseFrames, // ★文字列ではなく、計算済みのフレーム数を送る！
