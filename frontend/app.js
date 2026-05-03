@@ -94,6 +94,7 @@ let clockInterval = null;
 // 3. メッセージ送受信のハンドリング
 // --------------------------------------------------
 function handleServerMessage(data) {
+    console.log("Received message from server:", data);
     if (data.action === 'sync' || data.timecode) {
         currentState.state = data.state || currentState.state;
         currentState.reference_utc = data.reference_utc || currentState.reference_utc;

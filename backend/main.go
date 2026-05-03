@@ -143,7 +143,17 @@ func handleJoin(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 		},
 	})
 
-	resData, _ := json.Marshal(room)
+	syncMsg := ActionMessage{
+		Action:       "sync",
+		RoomID:       room.RoomID,
+		State:        room.State,
+		ReferenceUTC: room.ReferenceUTC,
+		BaseFrames:   room.BaseFrames,
+		FPS:          room.FPS,
+		IsDF:         room.IsDF,
+	}
+	
+	resData, _ := json.Marshal(syncMsg)
 	apigw.PostToConnection(&apigatewaymanagementapi.PostToConnectionInput{
 		ConnectionId: aws.String(connID),
 		Data:         resData,
@@ -155,36 +165,32 @@ func handleJoin(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGatewayManagementApi, connTable, roomTable string, msg ActionMessage) (events.APIGatewayProxyResponse, error) {
 	fmt.Printf("[SYNC] Updating room %s state to: %s (Ref: %d)\n", msg.RoomID, msg.State, msg.ReferenceUTC)
 	
+	// DBへの保存
 	roomUpdate := RoomState{
 		RoomID:       msg.RoomID,
 		RoomPin:      msg.Pin,
 		State:        msg.State,
 		ReferenceUTC: msg.ReferenceUTC,
-		BaseFrames:   msg.BaseFrames, // ここで数値を保存
+		BaseFrames:   msg.BaseFrames,
 		FPS:          msg.FPS,
 		IsDF:         msg.IsDF,
 	}
 	av, _ := dynamodbattribute.MarshalMap(roomUpdate)
-	db.PutItem(&dynamodb.PutItemInput{
-		TableName: aws.String(roomTable),
-		Item:      av,
-	})
+	db.PutItem(&dynamodb.PutItemInput{TableName: aws.String(roomTable), Item: av})
 
-	fmt.Printf("[SYNC] Scanning for members in room: %s\n", msg.RoomID)
-	scanOut, err := db.Scan(&dynamodb.ScanInput{
+	// 同じルームのメンバーを取得
+	scanOut, _ := db.Scan(&dynamodb.ScanInput{
 		TableName:        aws.String(connTable),
 		FilterExpression: aws.String("room_id = :r"),
 		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
 			":r": {S: aws.String(msg.RoomID)},
 		},
 	})
-	if err != nil {
-		fmt.Printf("[SYNC ERROR] Scan failed: %v\n", err)
-		return events.APIGatewayProxyResponse{StatusCode: 500}, err
-	}
 
-	fmt.Printf("[SYNC] Broadcasting to %d members...\n", len(scanOut.Items))
+	// ★ クライアントに送り返す前のアクション名を「sync」に強制上書き
+	msg.Action = "sync"
 	resData, _ := json.Marshal(msg)
+
 	success := 0
 	for _, item := range scanOut.Items {
 		targetID := *item["connectionId"].S
@@ -194,12 +200,9 @@ func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 		})
 		
 		if err != nil {
-			fmt.Printf("[SYNC] Failed to send to %s, removing stale connection.\n", targetID)
 			db.DeleteItem(&dynamodb.DeleteItemInput{
 				TableName: aws.String(connTable),
-				Key: map[string]*dynamodb.AttributeValue{
-					"connectionId": {S: aws.String(targetID)},
-				},
+				Key: map[string]*dynamodb.AttributeValue{"connectionId": {S: aws.String(targetID)}},
 			})
 		} else {
 			success++
