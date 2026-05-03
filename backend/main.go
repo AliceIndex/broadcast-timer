@@ -16,14 +16,14 @@ import (
 )
 
 type ActionMessage struct {
-	Action        string  `json:"action"`
-	RoomID        string  `json:"room_id"`
-	Pin           string  `json:"pin"`
-	State         string  `json:"state"`
-	ReferenceUTC  int64   `json:"reference_utc"`
-	BaseFrames    int64   `json:"base_frames"`
-	FPS           float64 `json:"fps"`
-	IsDF          bool    `json:"is_df"`
+	Action       string  `json:"action"`
+	RoomID       string  `json:"room_id"`
+	Pin          string  `json:"pin"`
+	State        string  `json:"state"`
+	ReferenceUTC int64   `json:"reference_utc"`
+	BaseFrames   int64   `json:"base_frames"`
+	FPS          float64 `json:"fps"`
+	IsDF         bool    `json:"is_df"`
 }
 
 type RoomState struct {
@@ -31,7 +31,7 @@ type RoomState struct {
 	RoomPin      string  `json:"room_pin" dynamodbav:"room_pin"`
 	State        string  `json:"state" dynamodbav:"state"`
 	ReferenceUTC int64   `json:"reference_utc" dynamodbav:"reference_utc"`
-	BaseFrames   int64   `json:"base_frames" dynamodbav:"base_frames"` // 数値で管理
+	BaseFrames   int64   `json:"base_frames" dynamodbav:"base_frames"`
 	FPS          float64 `json:"fps" dynamodbav:"fps"`
 	IsDF         bool    `json:"is_df" dynamodbav:"is_df"`
 }
@@ -59,21 +59,40 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 
 	if req.RequestContext.EventType == "DISCONNECT" {
 		fmt.Println("[DISCONNECT] Removing connection ID...")
+		
+		// 1. 削除前に、どの部屋にいたかを取得
+		result, err := db.GetItem(&dynamodb.GetItemInput{
+			TableName: aws.String(connTableName),
+			Key: map[string]*dynamodb.AttributeValue{
+				"connectionId": {S: aws.String(connectionID)},
+			},
+		})
+		var roomID string
+		if err == nil && result.Item != nil {
+			if rID, ok := result.Item["room_id"]; ok && rID.S != nil {
+				roomID = *rID.S
+			}
+		}
+
+		// 2. 名簿から削除
 		_, _ = db.DeleteItem(&dynamodb.DeleteItemInput{
 			TableName: aws.String(connTableName),
 			Key: map[string]*dynamodb.AttributeValue{
 				"connectionId": {S: aws.String(connectionID)},
 			},
 		})
+
+		// 3. 部屋が空になったか確認して削除
+		cleanupRoomIfEmpty(db, connTableName, roomTableName, roomID)
+
 		return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 	}
 
-	// ★ 400エラー特定のための最重要ログ
 	fmt.Printf("[DEBUG] Raw Request Body: %s\n", req.Body)
 
 	var msg ActionMessage
 	if err := json.Unmarshal([]byte(req.Body), &msg); err != nil {
-		fmt.Printf("[ERROR] JSON Unmarshal failed: %v\n", err) // ここで型の不一致がわかります
+		fmt.Printf("[ERROR] JSON Unmarshal failed: %v\n", err)
 		return events.APIGatewayProxyResponse{StatusCode: 400}, nil
 	}
 	fmt.Printf("[DEBUG] Action: %s, RoomID: %s\n", msg.Action, msg.RoomID)
@@ -87,7 +106,7 @@ func handler(ctx context.Context, req events.APIGatewayWebsocketProxyRequest) (e
 		return handleJoin(db, apigw, connTableName, roomTableName, connectionID, msg)
 	case "leave":
 		fmt.Println("[ACTION] Handling 'leave'...")
-		return handleLeave(db, connTableName, connectionID)
+		return handleLeave(db, connTableName, roomTableName, connectionID, msg)
 	default:
 		fmt.Printf("[ACTION] Handling Timer Operation: %s\n", msg.Action)
 		return handleSync(db, apigw, connTableName, roomTableName, msg)
@@ -112,12 +131,12 @@ func handleJoin(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 	if result.Item == nil {
 		fmt.Printf("[JOIN] Room %s not found. Creating new room...\n", msg.RoomID)
 		room = RoomState{
-			RoomID:        msg.RoomID,
-			RoomPin:       msg.Pin,
-			State:         "reset",
-			FPS:           msg.FPS,
-			IsDF:          msg.IsDF,
-			BaseFrames:    msg.BaseFrames,
+			RoomID:       msg.RoomID,
+			RoomPin:      msg.Pin,
+			State:        "reset",
+			FPS:          msg.FPS,
+			IsDF:         msg.IsDF,
+			BaseFrames:   msg.BaseFrames,
 		}
 		av, _ := dynamodbattribute.MarshalMap(room)
 		db.PutItem(&dynamodb.PutItemInput{
@@ -165,7 +184,6 @@ func handleJoin(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGatewayManagementApi, connTable, roomTable string, msg ActionMessage) (events.APIGatewayProxyResponse, error) {
 	fmt.Printf("[SYNC] Updating room %s state to: %s (Ref: %d)\n", msg.RoomID, msg.State, msg.ReferenceUTC)
 	
-	// DBへの保存
 	roomUpdate := RoomState{
 		RoomID:       msg.RoomID,
 		RoomPin:      msg.Pin,
@@ -178,7 +196,6 @@ func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 	av, _ := dynamodbattribute.MarshalMap(roomUpdate)
 	db.PutItem(&dynamodb.PutItemInput{TableName: aws.String(roomTable), Item: av})
 
-	// 同じルームのメンバーを取得
 	scanOut, _ := db.Scan(&dynamodb.ScanInput{
 		TableName:        aws.String(connTable),
 		FilterExpression: aws.String("room_id = :r"),
@@ -187,7 +204,7 @@ func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 		},
 	})
 
-	// ★ クライアントに送り返す前のアクション名を「sync」に強制上書き
+	// フロントエンドでの処理を簡略化するためアクション名を上書き
 	msg.Action = "sync"
 	resData, _ := json.Marshal(msg)
 
@@ -213,15 +230,55 @@ func handleSync(db *dynamodb.DynamoDB, apigw *apigatewaymanagementapi.ApiGateway
 	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }
 
-func handleLeave(db *dynamodb.DynamoDB, connTable, connID string) (events.APIGatewayProxyResponse, error) {
-	fmt.Printf("[LEAVE] Removing room binding for connection: %s\n", connID)
+func handleLeave(db *dynamodb.DynamoDB, connTable, roomTable, connID string, msg ActionMessage) (events.APIGatewayProxyResponse, error) {
+	fmt.Printf("[LEAVE] Removing room binding for connection: %s from room: %s\n", connID, msg.RoomID)
+	
+	// connectionIdは残し、room_idだけ消去
 	_, err := db.PutItem(&dynamodb.PutItemInput{
 		TableName: aws.String(connTable),
 		Item: map[string]*dynamodb.AttributeValue{
 			"connectionId": {S: aws.String(connID)},
 		},
 	})
+
+	cleanupRoomIfEmpty(db, connTable, roomTable, msg.RoomID)
+
 	return events.APIGatewayProxyResponse{StatusCode: 200}, err
+}
+
+func cleanupRoomIfEmpty(db *dynamodb.DynamoDB, connTable, roomTable, roomID string) {
+	if roomID == "" {
+		return
+	}
+
+	scanOut, err := db.Scan(&dynamodb.ScanInput{
+		TableName:        aws.String(connTable),
+		FilterExpression: aws.String("room_id = :r"),
+		ExpressionAttributeValues: map[string]*dynamodb.AttributeValue{
+			":r": {S: aws.String(roomID)},
+		},
+	})
+	if err != nil {
+		fmt.Printf("[CLEANUP ERROR] Scan failed for room %s: %v\n", roomID, err)
+		return
+	}
+
+	if len(scanOut.Items) == 0 {
+		fmt.Printf("[CLEANUP] Room %s is empty. Deleting from RoomStatesTable...\n", roomID)
+		_, err = db.DeleteItem(&dynamodb.DeleteItemInput{
+			TableName: aws.String(roomTable),
+			Key: map[string]*dynamodb.AttributeValue{
+				"room_id": {S: aws.String(roomID)},
+			},
+		})
+		if err != nil {
+			fmt.Printf("[CLEANUP ERROR] Failed to delete room %s: %v\n", roomID, err)
+		} else {
+			fmt.Printf("[CLEANUP SUCCESS] Room %s deleted.\n", roomID)
+		}
+	} else {
+		fmt.Printf("[CLEANUP] Room %s still has %d members.\n", roomID, len(scanOut.Items))
+	}
 }
 
 func main() {
