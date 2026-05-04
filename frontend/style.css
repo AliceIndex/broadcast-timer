@@ -17,6 +17,13 @@ body {
     font-family: 'JetBrains Mono', 'Source Code Pro', sans-serif;
 }
 
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+
 /* =========================================
    ルーム選択画面 (index.html) のスタイル
    ========================================= */
@@ -130,7 +137,9 @@ body {
     /* モニターと同様に全角化と等幅フォントを適用 */
     text-transform: full-width;
     font-family: "Courier New", Courier, monospace;
-    text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums; /* 数字の幅をすべて同じにする設定 */
 }
 
 .controller-body .timecode label {
