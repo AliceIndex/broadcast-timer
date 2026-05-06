@@ -138,7 +138,7 @@ function startClockMotor() {
         const currentTimecode = framesToTimecode(totalFrames, currentState.fps, currentState.is_df);
 
         if (timecodeDisplay) {
-            timecodeDisplay.textContent = currentTimecode;
+            timecodeDisplay.textContent = toZenkaku(currentTimecode);
         }
     }, 33);
 }
