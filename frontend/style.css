@@ -120,7 +120,7 @@ body {
     background: var(--panel-bg);
     padding: 1.5rem;
     border-radius: 12px;
-    max-width: 500px;
+    width: fit-content;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 
     display: flex;
@@ -134,8 +134,6 @@ body {
     font-size: 3.5rem;
     text-align: center;
     color: #ffffff;
-    /* モニターと同様に全角化と等幅フォントを適用 */
-    text-transform: full-width;
     font-family: "Courier New", Courier, monospace;
     text-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
     white-space: nowrap;
@@ -287,13 +285,8 @@ body {
 }
 
 .monitor-body #timecode-display {
-    font-size: 10vw;
-    /* より大きく視認性アップ */
-    /* 全角数字への変換（ブラウザのレイアウト機能を利用） */
-    text-transform: full-width;
-    /* タイムコードが左右にガタつかないよう、等幅フォントを指定 */
+    font-size: 9vw;
     font-family: "Courier New", Courier, monospace;
-    /* 折り返しを禁止して1行を死守 */
     white-space: nowrap;
     overflow: hidden;
 }
