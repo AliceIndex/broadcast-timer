@@ -342,6 +342,13 @@ function executeLeave() {
     window.location.href = "index.html";
 }
 
+// 半角の英数字、コロン、ハイフンを全角に変換する関数
+function toZenkaku(str) {
+    return str.replace(/[A-Za-z0-9:\-]/g, function(s) {
+        return String.fromCharCode(s.charCodeAt(0) + 0xFEE0);
+    });
+}
+
 // --------------------------------------------------
 // アプリケーション起動[cite: 1]
 // --------------------------------------------------
