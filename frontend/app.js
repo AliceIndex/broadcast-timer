@@ -110,12 +110,12 @@ function handleServerMessage(data) {
             stopClockMotor();
             if (timecodeDisplay) {
                 // ★リセット時は、下駄のフレーム数(base_frames)を文字に戻して表示する
-                timecodeDisplay.textContent = framesToTimecode(currentState.base_frames, currentState.fps, currentState.is_df);
+                timecodeDisplay.textContent = toZenkaku(framesToTimecode(currentState.base_frames, currentState.fps, currentState.is_df));
             }
         } else {
             stopClockMotor();
             if (timecodeDisplay && data.timecode) {
-                timecodeDisplay.textContent = data.timecode;
+                timecodeDisplay.textContent = toZenkaku(data.timecode);
             }
         }
     }
@@ -344,7 +344,7 @@ function executeLeave() {
 
 // 半角の英数字、コロン、ハイフンを全角に変換する関数
 function toZenkaku(str) {
-    return str.replace(/[A-Za-z0-9:\-]/g, function(s) {
+    return str.replace(/[A-Za-z0-9:\-]/g, function (s) {
         return String.fromCharCode(s.charCodeAt(0) + 0xFEE0);
     });
 }
@@ -355,5 +355,8 @@ function toZenkaku(str) {
 document.addEventListener('DOMContentLoaded', () => { //[cite: 1]
     initWebSocket(); //[cite: 1]
     bindEvents(); //[cite: 1]
-});
 
+    if (timecodeDisplay) {
+        timecodeDisplay.textContent = toZenkaku(currentState.timecode);
+    }
+});
